@@ -421,6 +421,26 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
 
 .recipegrid { grid-template-columns: 1fr 140px; }
 
+.vote {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.vote.good { color: var(--good); border: 1px solid #2f4a39; background: #17241c; }
+.vote.bad { color: var(--warn); border: 1px solid #4d3a1d; background: #241e14; }
+
+.votebtns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.votebtns button.on { border-color: var(--gold); color: var(--gold); }
+#voteWorks.on { border-color: var(--good); color: var(--good); }
+#voteWrong.on { border-color: var(--warn); color: var(--warn); }
+#voteBox .hint { margin: 0 0 9px; }
+
 @media (max-width: 760px) {
   .recipe { grid-template-columns: 1fr auto; }
   .recipe .rmats { grid-column: 1 / span 2; }

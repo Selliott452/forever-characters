@@ -24,6 +24,7 @@
   const state = {
     chars: [],
     recipes: [],   // rows from the sheet's Recipes tab, on top of the built-in list
+    votes: [],     // one row per person per recipe: have they seen it work in game?
     route: 'roster',
     ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tshow: 'now' },
   };
@@ -144,8 +145,32 @@
         corrects: !!(base && base.builtIn),
       });
     }
+
+    // Votes hang off whatever the recipe ended up being. A vote for a recipe
+    // that has since been renamed or hidden just doesn't find a home.
+    for (const r of map.values()) r.votes = { works: [], wrong: [] };
+    for (const v of state.votes) {
+      const prof = normProf(v.profession) || String(v.profession || '').trim();
+      const r = map.get(rkey(prof, v.name || ''));
+      if (!r || !String(v.by || '').trim()) continue;
+      (isWrong(v.verdict) ? r.votes.wrong : r.votes.works)
+        .push({ id: v.id, by: String(v.by).trim(), note: v.note || '' });
+    }
     RX = map;
   }
+
+  const isWrong = v => /^(wrong|no|bad|false)$/i.test(String(v || '').trim());
+  /** Confirmed by a real player beats whatever the guides said. */
+  const verified = r => !!(r.votes && r.votes.works.length);
+  const disputed = r => !!(r.votes && r.votes.wrong.length);
+  const myVote = r => {
+    if (!r.votes || !myName) return null;
+    const mine = n => n.by.toLowerCase() === myName.toLowerCase();
+    const yes = r.votes.works.find(mine);
+    if (yes) return { verdict: 'works', row: yes };
+    const no = r.votes.wrong.find(mine);
+    return no ? { verdict: 'wrong', row: no } : null;
+  };
 
   const recipesFor = prof => [...RX.values()]
     .filter(r => r.prof === prof)
@@ -186,7 +211,11 @@
       const res = await fetch(SCRIPT_URL);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Load failed');
-      return { characters: data.characters || [], recipes: data.recipes || [] };
+      return {
+        characters: data.characters || [],
+        recipes: data.recipes || [],
+        votes: data.votes || [],
+      };
     },
     async save(change) {
       // text/plain keeps this a "simple" request, so the browser skips the CORS preflight Apps Script can't answer.
@@ -197,7 +226,11 @@
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Save failed');
-      return { characters: data.characters || null, recipes: data.recipes || null };
+      return {
+        characters: data.characters || null,
+        recipes: data.recipes || null,
+        votes: data.votes || null,
+      };
     },
   };
 
@@ -206,16 +239,18 @@
       const roster = ls.get('wow-roster');
       let chars;
       try { chars = roster ? JSON.parse(roster) : null; } catch { chars = null; }
-      let recipes;
+      let recipes, votes;
       try { recipes = JSON.parse(ls.get('wow-recipes') || '[]'); } catch { recipes = []; }
+      try { votes = JSON.parse(ls.get('wow-votes') || '[]'); } catch { votes = []; }
       return {
         characters: chars || D.SEED.map(c => Object.assign({ id: newId() }, c)),
-        recipes,
+        recipes, votes,
       };
     },
     async save() {
       ls.set('wow-roster', JSON.stringify(state.chars));
       ls.set('wow-recipes', JSON.stringify(state.recipes));
+      ls.set('wow-votes', JSON.stringify(state.votes));
       return {};
     },
   };
@@ -226,10 +261,14 @@
   async function saveChanges(change) {
     status('Saving…');
     try {
-      const fresh = await store.save(Object.assign(
-        { upserts: [], deletes: [], recipeUpserts: [], recipeDeletes: [] }, change));
+      const fresh = await store.save(Object.assign({
+        upserts: [], deletes: [],
+        recipeUpserts: [], recipeDeletes: [],
+        voteUpserts: [], voteDeletes: [],
+      }, change));
       if (fresh.characters) state.chars = fresh.characters;
       if (fresh.recipes) state.recipes = fresh.recipes;
+      if (fresh.votes) state.votes = fresh.votes;
       status('Saved.');
       setTimeout(() => { if ($('status').textContent === 'Saved.') status(''); }, 1800);
     } catch (err) {
@@ -245,6 +284,7 @@
       const data = await store.load();
       state.chars = data.characters.map(c => Object.assign({}, c, { id: c.id || newId() }));
       state.recipes = data.recipes;
+      state.votes = data.votes || [];
       if (!quiet) status('');
     } catch (err) {
       status('Could not load the roster: ' + err.message);
@@ -520,6 +560,27 @@
     return rows;
   }
 
+  /**
+   * What the row says about how much to trust this recipe. Someone saying they
+   * made it in game outranks the "?" the guides earned, and someone saying it's
+   * wrong outranks both.
+   */
+  function voteTag(r) {
+    const v = r.votes || { works: [], wrong: [] };
+    const names = list => list.map(n => n.by).join(', ');
+    if (v.wrong.length) {
+      return `<span class="vote bad" title="${esc(names(v.wrong))} couldn’t make this as written">
+        ⚠ ${v.wrong.length} say${v.wrong.length === 1 ? 's' : ''} wrong</span>`;
+    }
+    if (v.works.length) {
+      return `<span class="vote good" title="Confirmed in game by ${esc(names(v.works))}">
+        ✓ confirmed${v.works.length > 1 ? ' ×' + v.works.length : ''}</span>`;
+    }
+    return r.unconfirmed
+      ? '<span class="tier" title="The guides still list this step as untested — nobody has confirmed it">?</span>'
+      : '';
+  }
+
   function recipeRow(row, noted) {
     const { r, prof, makers, closest, status } = row;
     const meta = D.PROFESSIONS[prof] || {};
@@ -530,10 +591,10 @@
     const credit = r.builtIn ? ''
       : `<span class="by-tag" title="${r.corrects ? 'Corrected' : 'Added'} by hand, not from the built-in list">${
           r.corrects ? 'fixed' : 'added'}${r.by ? ' by ' + esc(r.by) : ''}</span>`;
-    return `<div class="recipe ${status}" data-recipe="${esc(rkey(prof, r.name))}"${canWrite() ? ' title="Click to edit this recipe"' : ''}>
+    return `<div class="recipe ${status}" data-recipe="${esc(rkey(prof, r.name))}"${canWrite() ? ' title="Click to edit or confirm this recipe"' : ''}>
       <span class="rname">
         ${esc(r.name)}
-        ${r.unconfirmed ? '<span class="tier" title="The guides still list this step as untested">?</span>' : ''}
+        ${voteTag(r)}
         ${credit}
         ${noted ? '<span class="noted" title="Someone wrote this in the sheet">★</span>' : ''}
       </span>
@@ -566,19 +627,28 @@
     const counts = {
       now: rows.filter(r => r.status === 'now').length,
       soon: rows.filter(r => r.status === 'soon').length,
+      confirmed: rows.filter(r => verified(r.r)).length,
+      disputed: rows.filter(r => disputed(r.r)).length,
     };
+    // "Needs checking" is the useful subset: things someone could go and
+    // confirm in game now, that nobody has confirmed yet.
+    const inReach = row => row.status === 'now' || row.status === 'soon';
+    const needsCheck = row => inReach(row) && !verified(row.r);
+    const passes = row => ui.tshow === 'check' ? needsCheck(row)
+      : ({ now: ['now'], soon: ['now', 'soon'], all: ['now', 'soon', 'later'] }[ui.tshow] || ['now'])
+        .includes(row.status);
+
     const q = ui.tq.toLowerCase();
-    const visible = { now: ['now'], soon: ['now', 'soon'], all: ['now', 'soon', 'later'] }[ui.tshow];
     const list = rows
-      .filter(r => visible.includes(r.status))
+      .filter(passes)
       .filter(r => !q || (r.r.name + ' ' + r.r.mats + ' ' + r.prof + ' ' +
         r.makers.map(h => h.c.name).join(' ')).toLowerCase().includes(q));
 
     const stats = `<div class="stats">
       <div class="stat"><b>${counts.now}</b><span>Can make now</span></div>
       <div class="stat"><b>${counts.soon}</b><span>Nearly there</span></div>
+      <div class="stat"><b>${counts.confirmed}</b><span>Confirmed in game</span></div>
       <div class="stat"><b>${rows.length}</b><span>Recipes tracked</span></div>
-      <div class="stat"><b>${notes.length}</b><span>Notes from the sheet</span></div>
     </div>`;
 
     const toolbar = `<div class="toolbar">
@@ -590,8 +660,8 @@
       ${canWrite() ? '<button id="addRecipe">+ Recipe</button>' : ''}
       <span class="spacer"></span>
       <div class="chips">
-        ${[['now', 'Can make now'], ['soon', 'Nearly there'], ['all', 'Everything']].map(([k, label]) =>
-          `<button class="chip${ui.tshow === k ? ' on' : ''}" data-show="${k}">${label}</button>`).join('')}
+        ${[['now', 'Can make now'], ['soon', 'Nearly there'], ['check', 'Needs checking'], ['all', 'Everything']]
+          .map(([k, label]) => `<button class="chip${ui.tshow === k ? ' on' : ''}" data-show="${k}">${label}</button>`).join('')}
       </div>
     </div>`;
 
@@ -609,9 +679,11 @@
       }).join('')}</div>` : '';
 
     if (!list.length) {
-      return stats + toolbar + noteBlock +
-        `<p class="empty">${rows.length ? 'Nothing matches that.'
-          : 'No recipes for these professions yet — add them to recipes.js.'}</p>`;
+      const nothing = ui.tshow === 'check' && rows.length
+        ? 'Everything within reach has been confirmed in game. Nice.'
+        : rows.length ? 'Nothing matches that.'
+        : 'No recipes for these professions yet — add one with + Recipe.';
+      return stats + toolbar + noteBlock + `<p class="empty">${nothing}</p>`;
     }
 
     // Group what's left by profession, in the order the professions page uses.
@@ -795,9 +867,65 @@
         : 'Added by hand. Saving updates it for everyone.';
     $('removeRecipe').hidden = !r;
     $('removeRecipe').textContent = r && r.builtIn ? 'Hide it' : (r && r.corrects ? 'Undo the fix' : 'Remove');
+    renderVoteBox(r);
     rdlg.showModal();
     rform.name.focus();
   }
+
+  function renderVoteBox(r) {
+    $('voteBox').hidden = !r;
+    if (!r) return;
+    const v = r.votes || { works: [], wrong: [] };
+    const said = [];
+    if (v.works.length) said.push(`${v.works.map(n => n.by).join(', ')} made it`);
+    if (v.wrong.length) said.push(`${v.wrong.map(n => n.by).join(', ')} couldn’t`);
+    const mine = myVote(r);
+    $('voteState').textContent = said.join(' · ') || 'Nobody has checked this one in game yet.';
+    $('voteClear').hidden = !mine;
+    $('voteWorks').classList.toggle('on', !!mine && mine.verdict === 'works');
+    $('voteWrong').classList.toggle('on', !!mine && mine.verdict === 'wrong');
+  }
+
+  function castVote(verdict) {
+    const r = RX.get(rform.was.value);
+    if (!r) return;
+    const by = rform.by.value.trim();
+    if (!by) {
+      $('voteState').textContent = 'Put your name in first, so people know who checked it.';
+      rform.by.focus();
+      return;
+    }
+    myName = by;
+    ls.set('wow-who', myName);
+
+    const mine = myVote(r);   // matches on myName, which we just set
+    const row = {
+      id: (mine && mine.row.id) || newId(),
+      profession: r.prof, name: r.name, by, verdict, note: '',
+    };
+    const i = state.votes.findIndex(x => x.id === row.id);
+    if (i >= 0) state.votes[i] = row; else state.votes.push(row);
+
+    rdlg.close();
+    render();
+    saveChanges({ voteUpserts: [row] });
+  }
+
+  $('voteWorks').addEventListener('click', () => castVote('works'));
+  $('voteWrong').addEventListener('click', () => castVote('wrong'));
+  $('voteClear').addEventListener('click', () => {
+    const r = RX.get(rform.was.value);
+    const mine = r && myVote(r);
+    if (!mine) return;
+    state.votes = state.votes.filter(x => x.id !== mine.row.id);
+    rdlg.close();
+    render();
+    saveChanges({ voteDeletes: [mine.row.id] });
+  });
+
+  /** Every vote row pointing at a recipe, by id. */
+  const votesOn = r => state.votes.filter(v =>
+    rkey(normProf(v.profession) || String(v.profession || '').trim(), v.name || '') === rkey(r.prof, r.name));
 
   /** A row that hides a built-in recipe rather than replacing it. */
   const hideRow = (r, by) => ({
@@ -818,12 +946,24 @@
     ls.set('wow-who', myName);
 
     const upserts = [o];
+    const was = rform.was.value;
+    const prev = was ? RX.get(was) : null;
+
     // Renaming a correction would leave the original built-in showing as well,
     // so hide the one we were editing.
-    const was = rform.was.value;
-    if (was && was !== rkey(o.profession, o.name)) {
-      const old = RX.get(was);
-      if (old && old.builtIn) upserts.push(hideRow(old, o.by));
+    if (was && was !== rkey(o.profession, o.name) && prev && prev.builtIn) {
+      upserts.push(hideRow(prev, o.by));
+    }
+
+    // Votes confirm a specific skill and material list. Change either and the
+    // old confirmations no longer mean anything, so the recipe goes back to
+    // unchecked rather than carrying a ✓ it didn't earn.
+    const edited = prev && (String(prev.skill) !== String(o.skill) ||
+      (prev.mats || '') !== (o.mats || '') ||
+      rkey(prev.prof, prev.name) !== rkey(o.profession, o.name));
+    const voteDeletes = edited ? votesOn(prev).map(v => v.id).filter(Boolean) : [];
+    if (voteDeletes.length) {
+      state.votes = state.votes.filter(v => !voteDeletes.includes(v.id));
     }
 
     const i = state.recipes.findIndex(x => x.id === o.id);
@@ -832,7 +972,7 @@
 
     rdlg.close();
     render();
-    saveChanges({ recipeUpserts: upserts });
+    saveChanges({ recipeUpserts: upserts, voteDeletes });
   });
 
   $('removeRecipe').addEventListener('click', () => {

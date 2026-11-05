@@ -8,9 +8,13 @@
  *              list in recipes.js; a row here with the same profession + name
  *              replaces it, and a row with `removed` = yes hides it. That's how
  *              you fix a wrong skill number without anyone touching the code.
+ *   Votes    — one row per person per recipe, saying whether they've seen it
+ *              work in game. That's what clears the "?" on the provisional
+ *              entries, and what flags one as wrong.
  *
- * GET  <url>  -> { ok, characters: [...], recipes: [...] }      (public read)
- * POST <url>  body: { token, upserts, deletes, recipeUpserts, recipeDeletes }
+ * GET  <url>  -> { ok, characters: [...], recipes: [...], votes: [...] }
+ * POST <url>  body: { token, upserts, deletes, recipeUpserts, recipeDeletes,
+ *                     voteUpserts, voteDeletes }
  *
  * Both tabs stay friendly to hand-editing: add a row and leave `id` blank, and
  * the next write from the site fills one in.
@@ -33,12 +37,19 @@ const SHEETS = {
     required: ['profession', 'name'],
     numbers: ['skill'],
   },
+  votes: {
+    name: 'Votes',
+    headers: ['id', 'profession', 'name', 'by', 'verdict', 'note', 'updated'],
+    required: ['profession', 'name', 'by'],
+    numbers: [],
+  },
 };
 
 /** Run this once from the editor. It creates both tabs and logs your write token. */
 function setup() {
   getSheet_(SHEETS.roster);
   getSheet_(SHEETS.recipes);
+  getSheet_(SHEETS.votes);
   const props = PropertiesService.getScriptProperties();
   let token = props.getProperty('TOKEN');
   if (!token) {
@@ -53,6 +64,7 @@ function doGet() {
     ok: true,
     characters: readAll_(SHEETS.roster),
     recipes: readAll_(SHEETS.recipes),
+    votes: readAll_(SHEETS.votes),
   });
 }
 
@@ -64,11 +76,13 @@ function doPost(e) {
 
     const roster = applyChanges_(SHEETS.roster, body.upserts, body.deletes);
     const recipes = applyChanges_(SHEETS.recipes, body.recipeUpserts, body.recipeDeletes);
+    const votes = applyChanges_(SHEETS.votes, body.voteUpserts, body.voteDeletes);
     return json_({
       ok: true,
-      changed: roster.changed + recipes.changed,
+      changed: roster.changed + recipes.changed + votes.changed,
       characters: roster.rows,
       recipes: recipes.rows,
+      votes: votes.rows,
     });
   } catch (err) {
     return json_({ ok: false, error: String((err && err.message) || err) });

@@ -40,6 +40,14 @@ group edits the list from the site itself:
   added shows as *added by <name>*.
 - **Hide it** removes a built-in recipe that turned out not to exist. **Undo the fix** on
   a correction drops it and brings the original back.
+- **Have you made it?** in the same dialog is the vote: *It works* or *It's wrong*, one
+  per person. A confirmed recipe shows **✓ confirmed** and clears its **?**; a disputed
+  one shows **⚠ 1 says wrong** so nobody wastes materials on it. The **Needs checking**
+  filter lists what's in reach of someone's skill but nobody has confirmed — a to-do list
+  for the next time you're near a trainer.
+
+Editing a recipe's skill or materials clears its votes, since a confirmation of the old
+numbers says nothing about the new ones.
 
 So nobody has to touch code to fix a wrong skill number — which matters, because:
 
@@ -110,7 +118,7 @@ odd combinations and jokes like "AH Bot" work fine.
 
 ## The sheet
 
-Two tabs. `Recipes` holds what the group added or corrected, and starts empty — the
+Three tabs. `Recipes` holds what the group added or corrected, and starts empty — the
 built-in list covers the basics:
 
 ```
@@ -118,8 +126,16 @@ id | profession | name | skill | mats | note | removed | by | updated
 ```
 
 A row here replaces the built-in recipe with the same profession and name; `removed` set
-to `yes` hides it instead. Editing by hand in the sheet works just as well as editing on
-the site.
+to `yes` hides it instead.
+
+`Votes` is one row per person per recipe:
+
+```
+id | profession | name | by | verdict | note | updated
+```
+
+`verdict` is `works` or `wrong`. Editing by hand in the sheet works just as well as
+editing on the site, on either tab.
 
 `Roster` has one row per character:
 

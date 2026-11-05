@@ -145,6 +145,17 @@ Peacebloom = Spell Damage potion"></textarea>
       <input name="by" list="players" autocomplete="off" placeholder="so people know who to ask">
     </label>
 
+    <fieldset id="voteBox" hidden>
+      <legend>Have you made it?</legend>
+      <p class="hint" id="voteState"></p>
+      <div class="votebtns">
+        <button type="button" id="voteWorks">✓ It works</button>
+        <button type="button" id="voteWrong">⚠ It's wrong</button>
+        <button type="button" id="voteClear" hidden>Remove my vote</button>
+      </div>
+      <p class="hint">Confirming clears the <b>?</b> on a recipe the guides never verified.</p>
+    </fieldset>
+
     <menu>
       <button type="button" id="removeRecipe" class="danger" hidden>Remove</button>
       <span class="spacer"></span>
