@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Characters</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1><a href="#/roster">Forever Characters</a><span class="realm" id="realm"></span></h1>
+      <div class="actions">
+        <span id="mode" class="badge"></span>
+        <button id="keyBtn" hidden>Write key</button>
+        <button id="addBtn" class="primary" hidden>+ Character</button>
+      </div>
+    </div>
+
+    <nav class="tabs">
+      <a href="#/roster" data-tab="roster">Roster</a>
+      <a href="#/professions" data-tab="professions">Professions</a>
+      <a href="#/trades" data-tab="trades">Trade board</a>
+    </nav>
+
+    <div class="status" id="status"></div>
+  </div>
+</header>
+
+<main class="wrap" id="view"><p class="empty">Loading…</p></main>
+
+<footer class="wrap">
+  <span id="footnote"></span>
+</footer>
+
+<!-- Character add / edit -->
+<dialog id="charDialog" class="wide">
+  <form id="charForm">
+    <h2 id="charTitle">Character</h2>
+
+    <input type="hidden" name="id">
+
+    <div class="grid">
+      <label class="span2">Name
+        <input name="name" required autocomplete="off" spellcheck="false">
+      </label>
+      <label>Player
+        <input name="player" list="players" autocomplete="off">
+      </label>
+      <label>Level
+        <input name="level" type="number" min="1" max="120" inputmode="numeric">
+      </label>
+
+      <label>Race
+        <input name="race" list="races" autocomplete="off">
+      </label>
+      <label>Class
+        <input name="class" id="classInput" list="classes" autocomplete="off">
+      </label>
+      <label>Spec #1
+        <input name="spec1" list="specs" autocomplete="off">
+      </label>
+      <label>Spec #2
+        <input name="spec2" list="specs" autocomplete="off">
+      </label>
+    </div>
+
+    <fieldset>
+      <legend>Professions</legend>
+      <div class="grid profgrid">
+        <label class="span2">Profession #1
+          <input name="prof1" list="professions" autocomplete="off">
+        </label>
+        <label>Skill
+          <input name="prof1Level" type="number" min="0" max="1000" inputmode="numeric" placeholder="—">
+        </label>
+        <p class="hint" id="prof1Hint"></p>
+
+        <label class="span2">Profession #2
+          <input name="prof2" list="professions" autocomplete="off">
+        </label>
+        <label>Skill
+          <input name="prof2Level" type="number" min="0" max="1000" inputmode="numeric" placeholder="—">
+        </label>
+        <p class="hint" id="prof2Hint"></p>
+      </div>
+
+      <label>Plan
+        <input name="profPlan" autocomplete="off" placeholder="e.g. drop Skinning for Engineering at 60">
+      </label>
+
+      <label>What this character can make
+        <textarea name="trades" rows="3" placeholder="One per line, e.g.
+6 linen cloth = 6 slot bag
+Peacebloom = Spell Damage potion"></textarea>
+        <span class="hint">One per line. These show up on the trade board for everyone.</span>
+      </label>
+    </fieldset>
+
+    <label>Notes
+      <textarea name="notes" rows="2"></textarea>
+    </label>
+
+    <menu>
+      <button type="button" id="deleteBtn" class="danger" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="cancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </menu>
+  </form>
+</dialog>
+
+<!-- Write token -->
+<dialog id="keyDialog">
+  <form method="dialog">
+    <h2>Write key</h2>
+    <p>Paste the token that <code>setup()</code> logged in Apps Script. It's stored in this browser only; leave it blank to go read-only.</p>
+    <input id="keyInput" type="password" autocomplete="off" spellcheck="false">
+    <menu>
+      <button type="button" class="cancel">Cancel</button>
+      <button value="save" class="primary">Save</button>
+    </menu>
+  </form>
+</dialog>
+
+<datalist id="players"></datalist>
+<datalist id="races"></datalist>
+<datalist id="classes"></datalist>
+<datalist id="specs"></datalist>
+<datalist id="professions"></datalist>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
