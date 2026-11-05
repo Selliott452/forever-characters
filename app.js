@@ -6,7 +6,9 @@
   const SCRIPT_URL = (CFG.scriptUrl || '').trim();
   const LEVEL_MAX = Number(CFG.levelMax) || 60;
   const PROF_MAX = Number(CFG.professionMax) || 300;
-  const TIERS = D.TIERS.filter(t => t.at <= PROF_MAX);
+  const TIERS = D.TIERS;
+  const R = window.WOW_RECIPES || {};
+  const NEARLY = 25;   // skill points from "we can make this" to "nearly there"
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -22,7 +24,7 @@
   const state = {
     chars: [],
     route: 'roster',
-    ui: { q: '', player: '', group: 'player', tq: '' },
+    ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tshow: 'now' },
   };
   let token = ls.get('wow-token') || '';
 
@@ -48,21 +50,28 @@
     return D.PROFESSION_ALIASES[s.toLowerCase()] || '';
   }
 
-  /** Where a skill number sits on the ladder: rank name, next threshold, fill %. */
+  /**
+   * Where a skill number sits on the ladder. The bar fills towards the current
+   * rank's cap rather than towards 300, because that's the wall you actually
+   * hit: 44 Tailoring is more than half way through Apprentice, not 15% of the
+   * way to Artisan.
+   */
   function tierOf(level) {
     const n = Number(level);
     if (!Number.isFinite(n) || n <= 0) return null;
-    let i = 0;
-    for (let k = 0; k < TIERS.length; k++) if (n >= TIERS[k].at) i = k;
+    let i = TIERS.findIndex(t => n <= t.cap);
+    if (i < 0) i = TIERS.length - 1;
     const cur = TIERS[i];
     const next = TIERS[i + 1];
-    const ceiling = next ? next.at : PROF_MAX;
-    const span = Math.max(1, ceiling - cur.at);
+    const floor = i ? TIERS[i - 1].cap : 0;
     return {
       name: cur.name,
-      goal: Math.min(ceiling, PROF_MAX),
-      pct: Math.max(2, Math.min(100, Math.round(((n - cur.at) / span) * 100))),
-      capped: !next && n >= PROF_MAX,
+      goal: cur.cap,
+      pct: Math.max(2, Math.min(100, Math.round(((n - floor) / Math.max(1, cur.cap - floor)) * 100))),
+      capped: !next && n >= Math.min(cur.cap, PROF_MAX),
+      next,
+      // Trainers teach the next rank before you hit the current cap.
+      canTrain: next && n >= next.trainAt ? next : null,
     };
   }
 
@@ -97,6 +106,34 @@
 
   const tradesOf = c => String(c.trades || '')
     .split(/[\n;]+/).map(s => s.trim()).filter(Boolean);
+
+  /* ---------- recipes ---------- */
+
+  const recipesFor = name => R[name] || [];
+  const skillOf = h => Number(h.p.level) || 0;
+  /** "4x Bolt of Silk Cloth, 2x Red Dye" -> ["Bolt of Silk Cloth", "Red Dye"] */
+  const matsOf = r => String(r.mats || '').split(',')
+    .map(s => s.replace(/^\s*\d+\s*x\s*/i, '').trim()).filter(Boolean);
+
+  /**
+   * Tie a line someone wrote in the sheet to a real recipe. An exact name is a
+   * sure thing; otherwise we look for a material they named, which is how
+   * "Peacebloom = Spell Damage potion" finds Minor Arcane Elixir. Loose matches
+   * only count against recipes that character can already make, or every herb
+   * would match half the alchemy book.
+   */
+  function matchNote(text, profs) {
+    const low = text.toLowerCase();
+    const exact = [], loose = [];
+    for (const p of profs) {
+      for (const r of recipesFor(p.name)) {
+        if (low.includes(r.name.toLowerCase())) exact.push({ prof: p.name, r });
+        else if ((Number(p.level) || 0) >= r.skill &&
+                 matsOf(r).some(m => low.includes(m.toLowerCase()))) loose.push({ prof: p.name, r });
+      }
+    }
+    return exact.length ? { hits: exact, exact: true } : { hits: loose.slice(0, 3), exact: false };
+  }
 
   const primaryCount = c => profsOf(c)
     .filter(p => p.kind === 'gathering' || p.kind === 'crafting' || p.kind === 'unknown').length;
@@ -309,27 +346,28 @@
   }
 
   function pairingLine(name, meta, idx) {
-    if (meta.kind === 'crafting' && meta.needs) {
-      const src = idx.get(meta.needs);
-      if (src && src.holders.length) {
+    const out = [];
+    if (meta.needs) {
+      const src = idx.get(meta.needs) || { holders: [], planners: [] };
+      if (src.holders.length) {
         const who = src.holders.slice(0, 3).map(h => h.c.name).join(', ');
-        return `<p class="pairing ok">${D.PROFESSIONS[meta.needs].icon} ${esc(meta.needs)} covered by ${esc(who)}</p>`;
+        out.push(`<p class="pairing ok">${D.PROFESSIONS[meta.needs].icon} ${esc(meta.needs)} covered by ${esc(who)}</p>`);
+      } else if (src.planners.length) {
+        out.push(`<p class="pairing planned">${esc(meta.needs)} only planned, by ${esc(src.planners.map(c => c.name).join(', '))}</p>`);
+      } else {
+        out.push(`<p class="pairing miss">Wants ${esc(meta.needs)} — nobody has it yet</p>`);
       }
-      if (src && src.planners.length) {
-        return `<p class="pairing planned">${esc(meta.needs)} only planned, by ${esc(src.planners.map(c => c.name).join(', '))}</p>`;
-      }
-      return `<p class="pairing miss">Wants ${esc(meta.needs)} — nobody has it yet</p>`;
+    } else if (meta.kind === 'crafting' && !meta.gathers) {
+      out.push(`<p class="pairing">No gathering partner — materials come from drops</p>`);
     }
-    if (meta.kind === 'crafting') {
-      return `<p class="pairing">No gathering partner — materials come from drops</p>`;
-    }
-    if (meta.kind === 'gathering' && meta.feeds) {
+    if (meta.feeds) {
       const fed = meta.feeds.filter(f => (idx.get(f) || { holders: [] }).holders.length);
-      return fed.length
+      out.push(fed.length
         ? `<p class="pairing ok">Feeds ${esc(fed.join(', '))}</p>`
-        : `<p class="pairing">Feeds ${esc(meta.feeds.join(', '))} — none taken yet</p>`;
+        : `<p class="pairing">Feeds ${esc(meta.feeds.join(', '))} — none taken yet</p>`);
     }
-    return '';
+    if (meta.gathers) out.push(`<p class="pairing ok">Collects its own materials</p>`);
+    return out.join('');
   }
 
   function profCard(name, entry, idx) {
@@ -344,6 +382,13 @@
       ? state.chars.filter(c => primaryCount(c) < 2).slice(0, 4)
       : [];
 
+    const recipes = recipesFor(name);
+    const unlocked = recipes.filter(r => r.skill <= bestLevel).length;
+    const recipeLine = recipes.length
+      ? `<p class="unlocked"><b>${unlocked}</b> of ${recipes.length} tracked recipes unlocked
+           &middot; <a href="#/trades" data-prof="${esc(name)}">see them</a></p>`
+      : '';
+
     return `<article class="profcard${holders.length ? '' : ' gap'}">
       <h3>${meta.icon} ${esc(name)}<span class="kind">${esc(meta.kind)}</span></h3>
       <p class="makes">${esc(meta.makes || '')}</p>
@@ -354,6 +399,7 @@
             ? ` — free slots: ${esc(freeSlots.map(c => c.name).join(', '))}`
             : meta.kind === 'secondary' ? ' — anyone can take it alongside their primaries' : ''}</p>`}
       ${planners.length ? `<p class="pairing planned">Planned by ${esc(planners.map(c => c.name).join(', '))}</p>` : ''}
+      ${recipeLine}
       ${pairingLine(name, meta, idx)}
     </article>`;
   }
@@ -398,39 +444,135 @@
 
   /* ---------- view: trade board ---------- */
 
-  function renderTrades() {
+  /** Every recipe in a profession someone has, tagged with who can make it. */
+  function board(idx, profs) {
     const rows = [];
-    for (const c of state.chars) {
-      const crafts = profsOf(c).filter(p => p.kind === 'crafting' || p.kind === 'secondary');
-      for (const what of tradesOf(c)) rows.push({ c, what, crafts });
+    for (const prof of profs) {
+      const holders = (idx.get(prof) || { holders: [] }).holders;
+      for (const r of recipesFor(prof)) {
+        const makers = holders.filter(h => skillOf(h) >= r.skill);
+        let closest = null;
+        if (!makers.length && holders.length) {
+          const top = holders.reduce((a, b) => (skillOf(b) > skillOf(a) ? b : a));
+          closest = { c: top.c, gap: r.skill - skillOf(top) };
+        }
+        rows.push({
+          prof, r, makers, closest,
+          status: makers.length ? 'now' : closest && closest.gap <= NEARLY ? 'soon' : 'later',
+        });
+      }
     }
-    const q = state.ui.tq.toLowerCase();
-    const list = q ? rows.filter(r =>
-      (r.what + ' ' + r.c.name + ' ' + (r.c.player || '')).toLowerCase().includes(q)) : rows;
+    return rows;
+  }
 
-    const toolbar = `<div class="toolbar">
-      <input type="search" id="tq" placeholder="Search what we can make…" value="${esc(state.ui.tq)}">
-      <span class="spacer"></span>
-      <span class="badge">${rows.length} recipe${rows.length === 1 ? '' : 's'} on the board</span>
+  function recipeRow(row, noted) {
+    const { r, prof, makers, closest, status } = row;
+    const meta = D.PROFESSIONS[prof] || {};
+    const who = makers.length
+      ? makers.map(h => `<b style="--cc:${esc(classColor(h.c.class) || '#e6e9ef')}">${esc(h.c.name)}</b> ${skillOf(h)}`).join(', ')
+      : closest ? `${esc(closest.c.name)} is ${closest.gap} away`
+      : 'nobody has ' + esc(prof);
+    return `<div class="recipe ${status}">
+      <span class="rname">
+        ${esc(r.name)}
+        ${r.unconfirmed ? '<span class="tier" title="The guides still list this step as untested">?</span>' : ''}
+        ${noted ? '<span class="noted" title="Someone wrote this in the sheet">★</span>' : ''}
+      </span>
+      <span class="rskill">${meta.icon || ''} ${r.skill}</span>
+      <span class="rmats">${esc(r.mats)}${r.note ? ` <em>— ${esc(r.note)}</em>` : ''}</span>
+      <span class="rwho">${who}</span>
+    </div>`;
+  }
+
+  function renderTrades() {
+    const idx = professionIndex();
+    const ui = state.ui;
+    const ours = Object.keys(R).filter(p => (idx.get(p) || { holders: [] }).holders.length);
+    const profs = ui.tprof ? [ui.tprof] : (ours.length ? ours : Object.keys(R));
+    const rows = board(idx, profs);
+
+    // Lines people wrote in the sheet, tied back to real recipes where we can.
+    const notes = [];
+    const notedKeys = new Set();
+    for (const c of state.chars) {
+      const cp = profsOf(c);
+      for (const text of tradesOf(c)) {
+        const m = matchNote(text, cp);
+        m.hits.forEach(h => notedKeys.add(h.prof + '|' + h.r.name));
+        notes.push({ c, text, m });
+      }
+    }
+
+    const counts = {
+      now: rows.filter(r => r.status === 'now').length,
+      soon: rows.filter(r => r.status === 'soon').length,
+    };
+    const q = ui.tq.toLowerCase();
+    const visible = { now: ['now'], soon: ['now', 'soon'], all: ['now', 'soon', 'later'] }[ui.tshow];
+    const list = rows
+      .filter(r => visible.includes(r.status))
+      .filter(r => !q || (r.r.name + ' ' + r.r.mats + ' ' + r.prof + ' ' +
+        r.makers.map(h => h.c.name).join(' ')).toLowerCase().includes(q));
+
+    const stats = `<div class="stats">
+      <div class="stat"><b>${counts.now}</b><span>Can make now</span></div>
+      <div class="stat"><b>${counts.soon}</b><span>Nearly there</span></div>
+      <div class="stat"><b>${rows.length}</b><span>Recipes tracked</span></div>
+      <div class="stat"><b>${notes.length}</b><span>Notes from the sheet</span></div>
     </div>`;
 
-    if (!rows.length) {
-      return toolbar + `<p class="empty">Nothing on the board yet. Open a character and fill in
-        “What this character can make”.</p>`;
-    }
-    if (!list.length) return toolbar + '<p class="empty">Nothing matches that.</p>';
+    const toolbar = `<div class="toolbar">
+      <input type="search" id="tq" placeholder="Search recipes…" value="${esc(ui.tq)}">
+      <select id="tprof">
+        <option value=""${ui.tprof ? '' : ' selected'}>Professions we have</option>
+        ${Object.keys(R).map(p => `<option value="${esc(p)}"${ui.tprof === p ? ' selected' : ''}>${esc(p)}</option>`).join('')}
+      </select>
+      <span class="spacer"></span>
+      <div class="chips">
+        ${[['now', 'Can make now'], ['soon', 'Nearly there'], ['all', 'Everything']].map(([k, label]) =>
+          `<button class="chip${ui.tshow === k ? ' on' : ''}" data-show="${k}">${label}</button>`).join('')}
+      </div>
+    </div>`;
 
-    const body = list.map(r => {
-      const color = classColor(r.c.class);
-      const via = r.crafts.map(p => `${p.icon} ${p.name}${p.level === '' ? '' : ' ' + p.level}`).join(' · ');
-      return `<div class="trade" data-id="${esc(r.c.id)}" style="--cc:${esc(color || '#2c3645')}">
-        <span class="what">${esc(r.what)}</span>
-        <span class="by"><b>${esc(r.c.name)}</b>${r.c.player ? ' &middot; ' + esc(r.c.player) : ''}</span>
-        ${via ? `<span class="via">${esc(via)}</span>` : ''}
-      </div>`;
+    const noteBlock = notes.length ? `
+      <h2 class="section-title">From the sheet</h2>
+      <div class="trades">${notes.map(n => {
+        const color = classColor(n.c.class);
+        const hits = n.m.hits.map(h => `${D.PROFESSIONS[h.prof].icon} ${esc(h.r.name)}`).join(', ');
+        return `<div class="trade" data-id="${esc(n.c.id)}" style="--cc:${esc(color || '#2c3645')}">
+          <span class="what">${esc(n.text)}</span>
+          <span class="by"><b>${esc(n.c.name)}</b>${n.c.player ? ' &middot; ' + esc(n.c.player) : ''}</span>
+          ${hits ? `<span class="via">${n.m.exact ? '' : 'probably '}${hits}</span>`
+                 : '<span class="via">no matching recipe — kept as a note</span>'}
+        </div>`;
+      }).join('')}</div>` : '';
+
+    if (!list.length) {
+      return stats + toolbar + noteBlock +
+        `<p class="empty">${rows.length ? 'Nothing matches that.'
+          : 'No recipes for these professions yet — add them to recipes.js.'}</p>`;
+    }
+
+    // Group what's left by profession, in the order the professions page uses.
+    const groups = new Map();
+    for (const row of list) {
+      if (!groups.has(row.prof)) groups.set(row.prof, []);
+      groups.get(row.prof).push(row);
+    }
+    const body = [...groups.entries()].map(([prof, rs]) => {
+      const meta = D.PROFESSIONS[prof] || {};
+      const holders = (idx.get(prof) || { holders: [] }).holders;
+      const best = Math.max(0, ...holders.map(skillOf));
+      return `<div class="playerhead">
+          <h2>${meta.icon || ''} ${esc(prof)}</h2>
+          <span class="count">${holders.length ? `best skill ${best}` : 'nobody has this yet'}
+            &middot; ${rs.length} shown</span>
+        </div>
+        <div class="recipes">${rs.sort((a, b) => a.r.skill - b.r.skill)
+          .map(row => recipeRow(row, notedKeys.has(row.prof + '|' + row.r.name))).join('')}</div>`;
     }).join('');
 
-    return toolbar + `<div class="trades">${body}</div>`;
+    return stats + toolbar + noteBlock + body;
   }
 
   /* ---------- render & routing ---------- */
@@ -498,7 +640,16 @@
     const meta = D.PROFESSIONS[key];
     const bits = [`${meta.icon} ${key} · ${meta.kind}`];
     const t = tierOf(level);
-    if (t) bits.push(t.capped ? `maxed at ${PROF_MAX}` : `${t.name}, next rank at ${t.goal}`);
+    if (t) {
+      if (t.capped) bits.push(`maxed at ${t.goal}`);
+      else if (t.canTrain) bits.push(`${t.name} — can train ${t.canTrain.name} at level ${t.canTrain.level}`);
+      else if (t.next) bits.push(`${t.name} — train ${t.next.name} at ${t.next.trainAt}`);
+      else bits.push(`${t.name}, cap ${t.goal}`);
+    }
+    const known = recipesFor(key);
+    if (known.length) {
+      bits.push(`${known.filter(r => r.skill <= (Number(level) || 0)).length}/${known.length} tracked recipes`);
+    }
     if (meta.needs) {
       const holders = state.chars.filter(c => profsOf(c).some(p => p.name === meta.needs));
       bits.push(holders.length
@@ -597,7 +748,14 @@
 
   $('view').addEventListener('click', e => {
     const chip = e.target.closest('.chip');
-    if (chip) { state.ui.player = chip.dataset.player; return render(); }
+    if (chip) {
+      if (chip.dataset.show) state.ui.tshow = chip.dataset.show;
+      else state.ui.player = chip.dataset.player;
+      return render();
+    }
+    // "see them" on a profession card jumps to that profession's recipes.
+    const seeAll = e.target.closest('[data-prof]');
+    if (seeAll) { state.ui.tprof = seeAll.dataset.prof; state.ui.tshow = 'all'; return; }
 
     const row = e.target.closest('[data-id]');
     if (row && canWrite()) {
@@ -625,6 +783,7 @@
 
   $('view').addEventListener('change', e => {
     if (e.target.id === 'group') { state.ui.group = e.target.value; render(); }
+    if (e.target.id === 'tprof') { state.ui.tprof = e.target.value; render(); }
   });
 
   window.addEventListener('hashchange', route);

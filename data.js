@@ -24,7 +24,7 @@ window.WOW_DATA = (() => {
     Warrior: { color: '#C69B6D', specs: ['Arms', 'Fury', 'Protection'] },
   };
 
-  // Spelling we've already seen in the sheet, plus the obvious shorthand.
+  // Spelling we have already seen in the sheet, plus the obvious shorthand.
   const CLASS_ALIASES = {
     shamen: 'Shaman', sham: 'Shaman', shammy: 'Shaman',
     dk: 'Death Knight', dh: 'Demon Hunter',
@@ -45,28 +45,33 @@ window.WOW_DATA = (() => {
   ]);
 
   /**
+   * WoW: Forever has 9 primary professions and 3 secondary ones. Note there is
+   * no Jewelcrafting or Inscription, Enchanting both gathers and crafts, and
+   * the recommended partner for Tailoring is Enchanting (you disenchant what
+   * you make). Camping isn't a profession — every profession gets camp objects
+   * at skill 20, 140 and 300 instead.
+   *
    * kind:    'gathering' | 'crafting' | 'secondary'
-   * feeds:   the crafting professions this gathering skill supplies
-   * needs:   the gathering skill this crafting profession wants
+   * gathers: true if it also collects its own materials
+   * feeds:   the professions this one supplies
+   * needs:   the profession that supplies this one
    * makes:   a short "what is it for" line, shown on the Professions page
    */
   const PROFESSIONS = {
-    Mining: { kind: 'gathering', icon: '⛏️', feeds: ['Blacksmithing', 'Engineering', 'Jewelcrafting'], makes: 'Ore and bars for the metal trades' },
-    Herbalism: { kind: 'gathering', icon: '🌿', feeds: ['Alchemy', 'Inscription'], makes: 'Herbs for potions and inks' },
+    Mining: { kind: 'gathering', icon: '⛏️', feeds: ['Blacksmithing', 'Engineering'], makes: 'Ore, bars, stone and gems' },
+    Herbalism: { kind: 'gathering', icon: '🌿', feeds: ['Alchemy'], makes: 'Herbs for potions and elixirs' },
     Skinning: { kind: 'gathering', icon: '🔪', feeds: ['Leatherworking'], makes: 'Leather and hides' },
 
     Alchemy: { kind: 'crafting', icon: '⚗️', needs: 'Herbalism', makes: 'Potions, elixirs, flasks' },
     Blacksmithing: { kind: 'crafting', icon: '🔨', needs: 'Mining', makes: 'Plate and mail armour, weapons, sharpening stones' },
-    Enchanting: { kind: 'crafting', icon: '✨', needs: null, makes: 'Gear enchants — feeds itself by disenchanting drops' },
-    Engineering: { kind: 'crafting', icon: '⚙️', needs: 'Mining', makes: 'Bombs, goggles, gadgets, trinkets' },
-    Inscription: { kind: 'crafting', icon: '📜', needs: 'Herbalism', makes: 'Glyphs and scrolls' },
-    Jewelcrafting: { kind: 'crafting', icon: '💎', needs: 'Mining', makes: 'Gems and rings' },
+    Enchanting: { kind: 'crafting', icon: '✨', needs: null, gathers: true, feeds: ['Tailoring'], makes: 'Enchants, wands and relics — and the dust to make them' },
+    Engineering: { kind: 'crafting', icon: '⚙️', needs: 'Mining', makes: 'Bombs, goggles, gadgets, toys' },
     Leatherworking: { kind: 'crafting', icon: '🧵', needs: 'Skinning', makes: 'Leather and mail armour, armour kits' },
-    Tailoring: { kind: 'crafting', icon: '🧶', needs: null, makes: 'Cloth armour and bags — cloth comes from drops' },
+    Tailoring: { kind: 'crafting', icon: '🧶', needs: 'Enchanting', makes: 'Cloth armour and bags — cloth comes from drops' },
 
-    Cooking: { kind: 'secondary', icon: '🍖', needs: null, makes: 'Food buffs' },
-    'First Aid': { kind: 'secondary', icon: '🩹', needs: null, makes: 'Bandages' },
-    Fishing: { kind: 'secondary', icon: '🎣', needs: null, makes: 'Fish for cooking' },
+    Cooking: { kind: 'secondary', icon: '🍖', needs: 'Fishing', makes: 'Food buffs' },
+    'First Aid': { kind: 'secondary', icon: '🩹', needs: null, makes: 'Bandages, healing potions, debuff cures' },
+    Fishing: { kind: 'secondary', icon: '🎣', gathers: true, feeds: ['Cooking'], makes: 'Fish, for cooking and for Fire Oil' },
   };
 
   // Spellings from the sheet and the usual abbreviations.
@@ -82,20 +87,20 @@ window.WOW_DATA = (() => {
     lw: 'Leatherworking', leather: 'Leatherworking',
     tailor: 'Tailoring', tailering: 'Tailoring',
     cook: 'Cooking', 'first-aid': 'First Aid', firstaid: 'First Aid', fish: 'Fishing',
-    inscript: 'Inscription', scribe: 'Inscription',
   };
 
-  // Skill rank names, in order. Only the ones at or below config.professionMax
-  // are ever shown, so a Classic sheet stops at Artisan.
+  /**
+   * Forever's four training ranks. `cap` is the highest skill that rank allows,
+   * `trainAt` is the skill you need before a trainer will teach you the next
+   * one, and `level` is the character level that rank needs. So you can be
+   * sitting at 60 Tailoring, eligible to train Journeyman, but stuck at the
+   * Apprentice cap of 75 until you hit character level 10.
+   */
   const TIERS = [
-    { at: 1, name: 'Apprentice' },
-    { at: 75, name: 'Journeyman' },
-    { at: 150, name: 'Expert' },
-    { at: 225, name: 'Artisan' },
-    { at: 300, name: 'Master' },
-    { at: 375, name: 'Grand Master' },
-    { at: 450, name: 'Illustrious' },
-    { at: 525, name: 'Zen Master' },
+    { name: 'Apprentice', cap: 75, trainAt: 0, level: 1 },
+    { name: 'Journeyman', cap: 150, trainAt: 50, level: 10 },
+    { name: 'Expert', cap: 225, trainAt: 125, level: 20 },
+    { name: 'Artisan', cap: 300, trainAt: 200, level: 35 },
   ];
 
   // Used only in localStorage mode (empty scriptUrl), so the site has something

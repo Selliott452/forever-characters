@@ -1,7 +1,8 @@
 # Forever Characters
 
-A small website for tracking the forever characters you and your friends are levelling:
-who's playing what, where their professions are, and what the group can craft.
+A small website for tracking the characters you and your friends are levelling in
+**World of Warcraft: Forever**: who's playing what, where their professions are, and
+what the group can actually craft right now.
 
 Plain HTML/CSS/JS — no build step. It's hosted on GitHub Pages and reads and writes
 a Google Sheet through a small Apps Script web app.
@@ -11,15 +12,40 @@ a Google Sheet through a small Apps Script web app.
 - **Roster** — a card per character with class colour, level, specs and professions,
   grouped by player (or by class, or sorted by level). Search and filter by player.
 - **Professions** — the part worth having. For every profession: who has it, their skill
-  rank and progress to the next rank, a star on the group's best crafter, and whether
-  the gathering profession that supplies it is covered by anyone. Professions nobody has
-  are listed separately, with the characters who still have a free slot.
-- **Trade board** — everything the group can make, pulled from each character's
-  "what this character can make" list, searchable.
+  rank and progress towards that rank's cap, a star on the group's best crafter, how many
+  tracked recipes they've unlocked, and whether the profession that supplies it is covered
+  by anyone. Professions nobody has are listed separately, with the characters who still
+  have a free slot.
+- **Trade board** — the actual recipe list, 1-300, filtered against the group's real
+  skill levels. **Can make now** is what someone can craft today, with who and at what
+  skill; **Nearly there** is everything within 25 skill of somebody; **Everything** is
+  the full book. Each row shows the skill needed and the materials for one craft.
+  Lines people wrote in the sheet appear under *From the sheet* and are matched back to
+  real recipes — "Peacebloom = Spell Damage potion" finds Minor Arcane Elixir — and the
+  recipes they matched get a ★.
 
 Professions parse loosely: `Herblore`, `herb` and `Herbalism` all count as Herbalism,
 and a skill of `22?` reads as 22. Anything it doesn't recognise is kept and shown as
 typed, so nothing you write in the sheet gets lost.
+
+## The recipes
+
+`recipes.js` holds the 1-300 route for each crafting profession — 121 recipes with the
+skill they unlock at and the materials for one craft. It is a starter set, not the whole
+game: adding more is just adding lines to that file, and nothing else needs to change.
+
+Forever launched on 4 November 2026, so this data comes from community guides written
+during the beta rather than from anything official. Steps past skill 225 are the ones
+those guides still mark untested; the site shows them with a **?** so nobody plans a
+shopping trip around a number that might move. Sources are listed at the top of
+`recipes.js` — spot-check anything you're about to spend real gold on.
+
+Forever's professions differ from Classic's in ways the site already accounts for:
+nine primaries with no Jewelcrafting or Inscription, Enchanting both gathers and crafts,
+Tailoring's recommended partner is Enchanting, First Aid makes the healing potions that
+used to be Alchemy's, and the rank thresholds are Apprentice 75 / Journeyman 150 /
+Expert 225 / Artisan 300, trainable at 50, 125 and 200 with character levels 10, 20
+and 35.
 
 ## Running it locally
 
@@ -69,9 +95,9 @@ the files as-is.
 | `professionMax` | profession skill cap (default 300); also decides which skill ranks exist |
 | `realm` | optional label shown next to the title |
 
-Classes, races, specs, professions and the skill ranks live in `data.js`. They're only
-suggestions — every field accepts free text, so odd combinations and jokes like
-"AH Bot" work fine.
+Classes, races, specs, professions and the skill ranks live in `data.js`; the recipes
+live in `recipes.js`. The lists are only suggestions — every field accepts free text, so
+odd combinations and jokes like "AH Bot" work fine.
 
 ## The sheet
 
