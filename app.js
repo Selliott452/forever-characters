@@ -23,10 +23,12 @@
 
   const state = {
     chars: [],
+    recipes: [],   // rows from the sheet's Recipes tab, on top of the built-in list
     route: 'roster',
     ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tshow: 'now' },
   };
   let token = ls.get('wow-token') || '';
+  let myName = ls.get('wow-who') || '';   // name to credit recipes to, this browser only
 
   /* ---------- game-data helpers ---------- */
 
@@ -109,7 +111,46 @@
 
   /* ---------- recipes ---------- */
 
-  const recipesFor = name => R[name] || [];
+  /**
+   * The built-in list in recipes.js is a baseline, not the truth — the game is
+   * days old and the numbers came from beta guides. Rows on the sheet's Recipes
+   * tab sit on top of it: same profession + name replaces the built-in entry,
+   * and `removed` hides it. So the group can correct a skill level or delete a
+   * recipe that turned out not to exist without anyone editing code.
+   */
+  let RX = new Map();
+  const rkey = (prof, name) => prof + '|' + String(name).trim().toLowerCase();
+  const isYes = v => /^(yes|true|y|1|x)$/i.test(String(v || '').trim());
+
+  function rebuildRecipes() {
+    const map = new Map();
+    for (const prof of Object.keys(R)) {
+      for (const r of R[prof]) map.set(rkey(prof, r.name), Object.assign({ prof, builtIn: true }, r));
+    }
+    for (const u of state.recipes) {
+      const prof = normProf(u.profession) || String(u.profession || '').trim();
+      const name = String(u.name || '').trim();
+      if (!prof || !name) continue;
+      const k = rkey(prof, name);
+      if (isYes(u.removed)) { map.delete(k); continue; }
+      const base = map.get(k);
+      map.set(k, {
+        prof, name, id: u.id,
+        skill: Number(u.skill) || 0,
+        mats: u.mats || '',
+        note: u.note || '',
+        by: u.by || '',
+        builtIn: false,
+        corrects: !!(base && base.builtIn),
+      });
+    }
+    RX = map;
+  }
+
+  const recipesFor = prof => [...RX.values()]
+    .filter(r => r.prof === prof)
+    .sort((a, b) => a.skill - b.skill || a.name.localeCompare(b.name));
+  const recipeProfessions = () => [...new Set([...RX.values()].map(r => r.prof))];
   const skillOf = h => Number(h.p.level) || 0;
   /** "4x Bolt of Silk Cloth, 2x Red Dye" -> ["Bolt of Silk Cloth", "Red Dye"] */
   const matsOf = r => String(r.mats || '').split(',')
@@ -145,38 +186,50 @@
       const res = await fetch(SCRIPT_URL);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Load failed');
-      return data.characters || [];
+      return { characters: data.characters || [], recipes: data.recipes || [] };
     },
-    async save(upserts, deletes) {
+    async save(change) {
       // text/plain keeps this a "simple" request, so the browser skips the CORS preflight Apps Script can't answer.
       const res = await fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ token, upserts, deletes }),
+        body: JSON.stringify(Object.assign({ token }, change)),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Save failed');
-      return data.characters || null;
+      return { characters: data.characters || null, recipes: data.recipes || null };
     },
   };
 
   const local = {
     async load() {
-      const stored = ls.get('wow-roster');
-      if (!stored) return D.SEED.map(c => Object.assign({ id: newId() }, c));
-      try { return JSON.parse(stored); } catch { return []; }
+      const roster = ls.get('wow-roster');
+      let chars;
+      try { chars = roster ? JSON.parse(roster) : null; } catch { chars = null; }
+      let recipes;
+      try { recipes = JSON.parse(ls.get('wow-recipes') || '[]'); } catch { recipes = []; }
+      return {
+        characters: chars || D.SEED.map(c => Object.assign({ id: newId() }, c)),
+        recipes,
+      };
     },
-    async save() { ls.set('wow-roster', JSON.stringify(state.chars)); return null; },
+    async save() {
+      ls.set('wow-roster', JSON.stringify(state.chars));
+      ls.set('wow-recipes', JSON.stringify(state.recipes));
+      return {};
+    },
   };
 
   const store = SCRIPT_URL ? remote : local;
   const canWrite = () => !SCRIPT_URL || !!token;
 
-  async function saveChanges(upserts, deletes) {
+  async function saveChanges(change) {
     status('Saving…');
     try {
-      const fresh = await store.save(upserts || [], deletes || []);
-      if (fresh) state.chars = fresh;
+      const fresh = await store.save(Object.assign(
+        { upserts: [], deletes: [], recipeUpserts: [], recipeDeletes: [] }, change));
+      if (fresh.characters) state.chars = fresh.characters;
+      if (fresh.recipes) state.recipes = fresh.recipes;
       status('Saved.');
       setTimeout(() => { if ($('status').textContent === 'Saved.') status(''); }, 1800);
     } catch (err) {
@@ -189,7 +242,9 @@
   async function refresh(quiet) {
     if (!quiet) status('Loading…');
     try {
-      state.chars = (await store.load()).map(c => Object.assign({}, c, { id: c.id || newId() }));
+      const data = await store.load();
+      state.chars = data.characters.map(c => Object.assign({}, c, { id: c.id || newId() }));
+      state.recipes = data.recipes;
       if (!quiet) status('');
     } catch (err) {
       status('Could not load the roster: ' + err.message);
@@ -472,10 +527,14 @@
       ? makers.map(h => `<b style="--cc:${esc(classColor(h.c.class) || '#e6e9ef')}">${esc(h.c.name)}</b> ${skillOf(h)}`).join(', ')
       : closest ? `${esc(closest.c.name)} is ${closest.gap} away`
       : 'nobody has ' + esc(prof);
-    return `<div class="recipe ${status}">
+    const credit = r.builtIn ? ''
+      : `<span class="by-tag" title="${r.corrects ? 'Corrected' : 'Added'} by hand, not from the built-in list">${
+          r.corrects ? 'fixed' : 'added'}${r.by ? ' by ' + esc(r.by) : ''}</span>`;
+    return `<div class="recipe ${status}" data-recipe="${esc(rkey(prof, r.name))}"${canWrite() ? ' title="Click to edit this recipe"' : ''}>
       <span class="rname">
         ${esc(r.name)}
         ${r.unconfirmed ? '<span class="tier" title="The guides still list this step as untested">?</span>' : ''}
+        ${credit}
         ${noted ? '<span class="noted" title="Someone wrote this in the sheet">★</span>' : ''}
       </span>
       <span class="rskill">${meta.icon || ''} ${r.skill}</span>
@@ -487,8 +546,9 @@
   function renderTrades() {
     const idx = professionIndex();
     const ui = state.ui;
-    const ours = Object.keys(R).filter(p => (idx.get(p) || { holders: [] }).holders.length);
-    const profs = ui.tprof ? [ui.tprof] : (ours.length ? ours : Object.keys(R));
+    const all = recipeProfessions();
+    const ours = all.filter(p => (idx.get(p) || { holders: [] }).holders.length);
+    const profs = ui.tprof ? [ui.tprof] : (ours.length ? ours : all);
     const rows = board(idx, profs);
 
     // Lines people wrote in the sheet, tied back to real recipes where we can.
@@ -525,8 +585,9 @@
       <input type="search" id="tq" placeholder="Search recipes…" value="${esc(ui.tq)}">
       <select id="tprof">
         <option value=""${ui.tprof ? '' : ' selected'}>Professions we have</option>
-        ${Object.keys(R).map(p => `<option value="${esc(p)}"${ui.tprof === p ? ' selected' : ''}>${esc(p)}</option>`).join('')}
+        ${all.map(p => `<option value="${esc(p)}"${ui.tprof === p ? ' selected' : ''}>${esc(p)}</option>`).join('')}
       </select>
+      ${canWrite() ? '<button id="addRecipe">+ Recipe</button>' : ''}
       <span class="spacer"></span>
       <div class="chips">
         ${[['now', 'Can make now'], ['soon', 'Nearly there'], ['all', 'Everything']].map(([k, label]) =>
@@ -578,6 +639,7 @@
   /* ---------- render & routing ---------- */
 
   function render() {
+    rebuildRecipes();
     const view = $('view');
     document.querySelectorAll('.tabs a').forEach(a =>
       a.classList.toggle('on', a.dataset.tab === state.route));
@@ -691,7 +753,7 @@
 
     dlg.close();
     render();
-    saveChanges([c], []);
+    saveChanges({ upserts: [c] });
   });
 
   $('deleteBtn').addEventListener('click', () => {
@@ -701,7 +763,7 @@
     state.chars = state.chars.filter(x => x.id !== id);
     dlg.close();
     render();
-    saveChanges([], [id]);
+    saveChanges({ deletes: [id] });
   });
 
   $('classInput').addEventListener('input', e => specsFor(e.target.value));
@@ -710,6 +772,91 @@
 
   document.querySelectorAll('dialog .cancel').forEach(b =>
     b.addEventListener('click', () => b.closest('dialog').close('cancel')));
+
+  /* ---------- recipe dialog ---------- */
+
+  const rdlg = $('recipeDialog');
+  const rform = $('recipeForm');
+
+  function openRecipe(r) {
+    const blank = { id: '', was: '', profession: state.ui.tprof || '', name: '', skill: '', mats: '', note: '', by: myName };
+    const data = r ? {
+      id: r.id || '', was: rkey(r.prof, r.name),
+      profession: r.prof, name: r.name, skill: r.skill || '',
+      mats: r.mats || '', note: r.note || '', by: r.by || myName,
+    } : blank;
+    for (const k of Object.keys(blank)) if (rform[k]) rform[k].value = data[k] ?? '';
+
+    $('recipeTitle').textContent = r ? r.name : 'New recipe';
+    $('recipeLead').textContent = !r
+      ? 'This goes in the sheet, so everyone sees it.'
+      : r.builtIn
+        ? 'This one ships with the site, from a beta guide. Saving writes a correction to the sheet that replaces it for everyone.'
+        : 'Added by hand. Saving updates it for everyone.';
+    $('removeRecipe').hidden = !r;
+    $('removeRecipe').textContent = r && r.builtIn ? 'Hide it' : (r && r.corrects ? 'Undo the fix' : 'Remove');
+    rdlg.showModal();
+    rform.name.focus();
+  }
+
+  /** A row that hides a built-in recipe rather than replacing it. */
+  const hideRow = (r, by) => ({
+    id: newId(), profession: r.prof, name: r.name,
+    skill: r.skill || '', mats: r.mats || '', note: r.note || '',
+    removed: 'yes', by: by || '',
+  });
+
+  rform.addEventListener('submit', e => {
+    e.preventDefault();
+    const o = {};
+    new FormData(rform).forEach((v, k) => { o[k] = typeof v === 'string' ? v.trim() : v; });
+    if (!o.profession || !o.name) return;
+    o.profession = normProf(o.profession) || o.profession;
+    o.id = o.id || newId();
+    o.removed = '';
+    myName = o.by;
+    ls.set('wow-who', myName);
+
+    const upserts = [o];
+    // Renaming a correction would leave the original built-in showing as well,
+    // so hide the one we were editing.
+    const was = rform.was.value;
+    if (was && was !== rkey(o.profession, o.name)) {
+      const old = RX.get(was);
+      if (old && old.builtIn) upserts.push(hideRow(old, o.by));
+    }
+
+    const i = state.recipes.findIndex(x => x.id === o.id);
+    if (i >= 0) state.recipes[i] = o; else state.recipes.push(o);
+    upserts.slice(1).forEach(row => state.recipes.push(row));
+
+    rdlg.close();
+    render();
+    saveChanges({ recipeUpserts: upserts });
+  });
+
+  $('removeRecipe').addEventListener('click', () => {
+    const r = RX.get(rform.was.value);
+    if (!r) return;
+    const ask = r.builtIn
+      ? `Hide ${r.name} from the board for everyone?`
+      : r.corrects ? `Drop your changes to ${r.name} and go back to the built-in one?`
+      : `Remove ${r.name}? This deletes its row from the sheet.`;
+    if (!confirm(ask)) return;
+
+    if (r.builtIn) {
+      const row = hideRow(r, myName);
+      state.recipes.push(row);
+      rdlg.close();
+      render();
+      saveChanges({ recipeUpserts: [row] });
+    } else {
+      state.recipes = state.recipes.filter(x => x.id !== r.id);
+      rdlg.close();
+      render();
+      saveChanges({ recipeDeletes: [r.id] });
+    }
+  });
 
   /* ---------- write key ---------- */
 
@@ -747,6 +894,16 @@
   $('addBtn').addEventListener('click', () => openChar(null));
 
   $('view').addEventListener('click', e => {
+    if (e.target.id === 'addRecipe') return openRecipe(null);
+
+    const rec = e.target.closest('[data-recipe]');
+    if (rec) {
+      if (!canWrite()) return;
+      const r = RX.get(rec.dataset.recipe);
+      if (r) openRecipe(r);
+      return;
+    }
+
     const chip = e.target.closest('.chip');
     if (chip) {
       if (chip.dataset.show) state.ui.tshow = chip.dataset.show;

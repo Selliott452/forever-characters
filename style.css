@@ -402,6 +402,24 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
 .recipe.now .rwho { color: var(--muted); }
 .recipe .rwho b { color: var(--cc, var(--text)); font-weight: 600; }
 .recipe .noted { color: var(--gold); margin-left: 4px; }
+.recipe[data-recipe] { cursor: pointer; }
+.recipe[data-recipe]:hover { border-color: #3d4a5c; }
+
+.by-tag {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--good);
+  border: 1px solid #2f4a39;
+  background: #18271e;
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  font-weight: 400;
+}
+
+.recipegrid { grid-template-columns: 1fr 140px; }
 
 @media (max-width: 760px) {
   .recipe { grid-template-columns: 1fr auto; }

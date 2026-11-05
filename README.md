@@ -31,8 +31,17 @@ typed, so nothing you write in the sheet gets lost.
 ## The recipes
 
 `recipes.js` holds the 1-300 route for each crafting profession — 121 recipes with the
-skill they unlock at and the materials for one craft. It is a starter set, not the whole
-game: adding more is just adding lines to that file, and nothing else needs to change.
+skill they unlock at and the materials for one craft. That file is the baseline; the
+group edits the list from the site itself:
+
+- **+ Recipe** on the trade board adds one.
+- **Clicking any recipe** opens it for editing. Correcting a built-in writes a row to the
+  sheet's `Recipes` tab that replaces it for everyone, tagged *fixed by <name>*; one you
+  added shows as *added by <name>*.
+- **Hide it** removes a built-in recipe that turned out not to exist. **Undo the fix** on
+  a correction drops it and brings the original back.
+
+So nobody has to touch code to fix a wrong skill number — which matters, because:
 
 Forever launched on 4 November 2026, so this data comes from community guides written
 during the beta rather than from anything official. Steps past skill 225 are the ones
@@ -101,7 +110,18 @@ odd combinations and jokes like "AH Bot" work fine.
 
 ## The sheet
 
-One `Roster` tab, one row per character:
+Two tabs. `Recipes` holds what the group added or corrected, and starts empty — the
+built-in list covers the basics:
+
+```
+id | profession | name | skill | mats | note | removed | by | updated
+```
+
+A row here replaces the built-in recipe with the same profession and name; `removed` set
+to `yes` hides it instead. Editing by hand in the sheet works just as well as editing on
+the site.
+
+`Roster` has one row per character:
 
 ```
 id | name | player | level | race | class | spec1 | spec2 |

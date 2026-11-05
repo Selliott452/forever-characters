@@ -111,6 +111,49 @@ Peacebloom = Spell Damage potion"></textarea>
   </form>
 </dialog>
 
+<!-- Add / correct a recipe -->
+<dialog id="recipeDialog">
+  <form id="recipeForm">
+    <h2 id="recipeTitle">Recipe</h2>
+    <p id="recipeLead"></p>
+
+    <input type="hidden" name="id">
+    <input type="hidden" name="was">
+
+    <div class="grid recipegrid">
+      <label>Profession
+        <input name="profession" list="professions" required autocomplete="off">
+      </label>
+      <label>Unlocks at skill
+        <input name="skill" type="number" min="1" max="1000" inputmode="numeric" required>
+      </label>
+    </div>
+
+    <label>Recipe name
+      <input name="name" required autocomplete="off" spellcheck="false" placeholder="e.g. Linen Bag">
+    </label>
+
+    <label>Materials for one craft
+      <input name="mats" autocomplete="off" placeholder="e.g. 3x Bolt of Linen Cloth, 1x Coarse Thread">
+    </label>
+
+    <label>Note
+      <input name="note" autocomplete="off" placeholder="e.g. pattern drops in Deadmines">
+    </label>
+
+    <label>Your name
+      <input name="by" list="players" autocomplete="off" placeholder="so people know who to ask">
+    </label>
+
+    <menu>
+      <button type="button" id="removeRecipe" class="danger" hidden>Remove</button>
+      <span class="spacer"></span>
+      <button type="button" class="cancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </menu>
+  </form>
+</dialog>
+
 <!-- Write token -->
 <dialog id="keyDialog">
   <form method="dialog">
