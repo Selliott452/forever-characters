@@ -3,18 +3,13 @@
  *
  * Two tabs, both one row per thing, both keyed by a short `id` so a rename
  * doesn't lose the row:
- *   Roster   — the characters.
- *   Recipes  — recipes the group added or corrected. The site ships a built-in
- *              list in recipes.js; a row here with the same profession + name
- *              replaces it, and a row with `removed` = yes hides it. That's how
- *              you fix a wrong skill number without anyone touching the code.
- *   Votes    — one row per person per recipe, saying whether they've seen it
- *              work in game. That's what clears the "?" on the provisional
- *              entries, and what flags one as wrong.
+ *   Roster — the characters.
+ *   Posts  — the trade board. One row per trade somebody has posted. Nothing is
+ *            generated or imported: every row is there because a person typed
+ *            it, on the site or straight into the sheet.
  *
- * GET  <url>  -> { ok, characters: [...], recipes: [...], votes: [...] }
- * POST <url>  body: { token, upserts, deletes, recipeUpserts, recipeDeletes,
- *                     voteUpserts, voteDeletes }
+ * GET  <url>  -> { ok, characters: [...], posts: [...] }
+ * POST <url>  body: { token, upserts, deletes, postUpserts, postDeletes }
  *
  * Both tabs stay friendly to hand-editing: add a row and leave `id` blank, and
  * the next write from the site fills one in.
@@ -31,16 +26,10 @@ const SHEETS = {
     required: ['name'],
     numbers: ['level', 'prof1Level', 'prof2Level'],
   },
-  recipes: {
-    name: 'Recipes',
-    headers: ['id', 'profession', 'name', 'skill', 'mats', 'note', 'removed', 'by', 'updated'],
-    required: ['profession', 'name'],
-    numbers: ['skill'],
-  },
-  votes: {
-    name: 'Votes',
-    headers: ['id', 'profession', 'name', 'by', 'verdict', 'note', 'updated'],
-    required: ['profession', 'name', 'by'],
+  posts: {
+    name: 'Posts',
+    headers: ['id', 'char', 'profession', 'item', 'mats', 'note', 'by', 'updated'],
+    required: ['item'],
     numbers: [],
   },
 };
@@ -48,8 +37,7 @@ const SHEETS = {
 /** Run this once from the editor. It creates both tabs and logs your write token. */
 function setup() {
   getSheet_(SHEETS.roster);
-  getSheet_(SHEETS.recipes);
-  getSheet_(SHEETS.votes);
+  getSheet_(SHEETS.posts);
   const props = PropertiesService.getScriptProperties();
   let token = props.getProperty('TOKEN');
   if (!token) {
@@ -63,8 +51,7 @@ function doGet() {
   return json_({
     ok: true,
     characters: readAll_(SHEETS.roster),
-    recipes: readAll_(SHEETS.recipes),
-    votes: readAll_(SHEETS.votes),
+    posts: readAll_(SHEETS.posts),
   });
 }
 
@@ -75,14 +62,12 @@ function doPost(e) {
     if (!token || body.token !== token) return json_({ ok: false, error: 'Wrong token' });
 
     const roster = applyChanges_(SHEETS.roster, body.upserts, body.deletes);
-    const recipes = applyChanges_(SHEETS.recipes, body.recipeUpserts, body.recipeDeletes);
-    const votes = applyChanges_(SHEETS.votes, body.voteUpserts, body.voteDeletes);
+    const posts = applyChanges_(SHEETS.posts, body.postUpserts, body.postDeletes);
     return json_({
       ok: true,
-      changed: roster.changed + recipes.changed + votes.changed,
+      changed: roster.changed + posts.changed,
       characters: roster.rows,
-      recipes: recipes.rows,
-      votes: votes.rows,
+      posts: posts.rows,
     });
   } catch (err) {
     return json_({ ok: false, error: String((err && err.message) || err) });
@@ -191,18 +176,12 @@ function applyChanges_(cfg, upserts, deletes) {
 
 /**
  * Optional: run once to fill an empty Roster with the characters we started
- * from. It does nothing if the tab already has rows. The Recipes tab is meant
- * to start empty — the site's built-in list covers the basics.
+ * from, and the Posts tab with the two trades that were in the old sheet.
+ * Either one is skipped if its tab already has rows.
  */
 function seedRoster() {
-  const cfg = SHEETS.roster;
-  const sh = getSheet_(cfg);
-  if (sh.getLastRow() > 1) {
-    Logger.log('Roster already has rows — not seeding.');
-    return;
-  }
-  // name, player, level, race, class, spec1, spec2, prof1, lvl, prof2, lvl, plan, trades, notes
-  const seed = [
+  seedTab_(SHEETS.roster, [
+    // name, player, level, race, class, spec1, spec2, prof1, lvl, prof2, lvl, plan, trades, notes
     ['Daz Moonspear', 'Josh', 1, 'Night Elf', 'Druid', 'Feral (Bear)', 'Feral (Cat)', 'Skinning', 1, 'Leatherworking', 1, 'Transition Skinning to Engineering end game', '', ''],
     ['Daz Lighthammer', 'Josh', 9, 'Dwarf', 'Paladin', 'Protection', 'Retribution', 'Mining', 1, 'Blacksmithing', 1, '', '', ''],
     ['Daz Stoneblade', 'Josh', 1, 'Night Elf', 'Warrior', 'Protection', 'Fury', '', '', '', '', '', '', ''],
@@ -212,12 +191,25 @@ function seedRoster() {
     ['Summon Yous', 'Adam', 1, 'Human', 'Warlock', 'AH Bot', 'Summon Bot', '', '', '', '', '', '', ''],
     ['Oran Ge eard', 'Ryan', 9, 'Dwarf', 'Shaman', 'TBD', 'TBD', 'Mining', '', '', '', '', '', ''],
     ['Anya BlazinBraids', 'Sam', 10, 'Dwarf', 'Priest', 'Shadow', 'TBD', 'Enchanting', 22, 'Tailoring', 44, '', '6 linen cloth = 6 slot bag', ''],
-  ];
+  ]);
+
+  seedTab_(SHEETS.posts, [
+    // char, profession, item, mats, note, by
+    ['Anya BlazinBraids', 'Enchanting', 'Minor Wizard Oil', 'bring the oil, I have the dust', 'free for the group', 'Sam'],
+  ]);
+}
+
+function seedTab_(cfg, seed) {
+  const sh = getSheet_(cfg);
+  if (sh.getLastRow() > 1) {
+    Logger.log(cfg.name + ' already has rows — not seeding.');
+    return;
+  }
   const now = new Date().toISOString();
   const rows = seed.map(function (s) { return [Utilities.getUuid().slice(0, 8)].concat(s, [now]); });
   sh.getRange(2, 1, rows.length, cfg.headers.length).setNumberFormat('@');
   sh.getRange(2, 1, rows.length, cfg.headers.length).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' characters.');
+  Logger.log('Seeded ' + rows.length + ' rows into ' + cfg.name + '.');
 }
 
 function json_(obj) {

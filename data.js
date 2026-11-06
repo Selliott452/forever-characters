@@ -117,5 +117,11 @@ window.WOW_DATA = (() => {
     { name: 'Anya BlazinBraids', player: 'Sam', level: 10, race: 'Dwarf', class: 'Priest', spec1: 'Shadow', spec2: 'TBD', prof1: 'Enchanting', prof1Level: 22, prof2: 'Tailoring', prof2Level: 44, profPlan: '', trades: '6 linen cloth = 6 slot bag', notes: '' },
   ];
 
-  return { CLASSES, CLASS_ALIASES, RACES, ALLIANCE, PROFESSIONS, PROFESSION_ALIASES, TIERS, SEED };
+  // One example trade so the board isn't empty before anyone posts. Every
+  // trade on the board is typed by a person — nothing is generated.
+  const SEED_POSTS = [
+    { char: 'Anya BlazinBraids', profession: 'Enchanting', item: 'Minor Wizard Oil', mats: 'bring the oil, I have the dust', note: 'free for the group', by: 'Sam' },
+  ];
+
+  return { CLASSES, CLASS_ALIASES, RACES, ALLIANCE, PROFESSIONS, PROFESSION_ALIASES, TIERS, SEED, SEED_POSTS };
 })();

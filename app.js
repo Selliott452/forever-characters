@@ -7,8 +7,6 @@
   const LEVEL_MAX = Number(CFG.levelMax) || 60;
   const PROF_MAX = Number(CFG.professionMax) || 300;
   const TIERS = D.TIERS;
-  const R = window.WOW_RECIPES || {};
-  const NEARLY = 25;   // skill points from "we can make this" to "nearly there"
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -23,13 +21,12 @@
 
   const state = {
     chars: [],
-    recipes: [],   // rows from the sheet's Recipes tab, on top of the built-in list
-    votes: [],     // one row per person per recipe: have they seen it work in game?
+    posts: [],     // the trade board: one row per thing somebody offers to make
     route: 'roster',
-    ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tshow: 'now' },
+    ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tgroup: 'profession' },
   };
   let token = ls.get('wow-token') || '';
-  let myName = ls.get('wow-who') || '';   // name to credit recipes to, this browser only
+  let myName = ls.get('wow-who') || '';   // name to sign posts with, this browser only
 
   /* ---------- game-data helpers ---------- */
 
@@ -107,98 +104,57 @@
       .filter(p => !have.has(p) && new RegExp('\\b' + p + '\\b', 'i').test(text));
   }
 
+  /** The "what this character can make" lines from a character's own card. */
   const tradesOf = c => String(c.trades || '')
     .split(/[\n;]+/).map(s => s.trim()).filter(Boolean);
 
-  /* ---------- recipes ---------- */
+  /* ---------- the trade board ---------- */
 
   /**
-   * The built-in list in recipes.js is a baseline, not the truth — the game is
-   * days old and the numbers came from beta guides. Rows on the sheet's Recipes
-   * tab sit on top of it: same profession + name replaces the built-in entry,
-   * and `removed` hides it. So the group can correct a skill level or delete a
-   * recipe that turned out not to exist without anyone editing code.
+   * Trades are just what people typed. Nothing is generated from a recipe list
+   * or fetched from anywhere, so the only derived bit is the link back to a
+   * roster character: we match on name, so the sheet stays readable and a
+   * trade posted for someone not on the roster still shows.
    */
-  let RX = new Map();
-  const rkey = (prof, name) => prof + '|' + String(name).trim().toLowerCase();
-  const isYes = v => /^(yes|true|y|1|x)$/i.test(String(v || '').trim());
+  const charNamed = name => state.chars.find(c =>
+    String(c.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
 
-  function rebuildRecipes() {
-    const map = new Map();
-    for (const prof of Object.keys(R)) {
-      for (const r of R[prof]) map.set(rkey(prof, r.name), Object.assign({ prof, builtIn: true }, r));
-    }
-    for (const u of state.recipes) {
-      const prof = normProf(u.profession) || String(u.profession || '').trim();
-      const name = String(u.name || '').trim();
-      if (!prof || !name) continue;
-      const k = rkey(prof, name);
-      if (isYes(u.removed)) { map.delete(k); continue; }
-      const base = map.get(k);
-      map.set(k, {
-        prof, name, id: u.id,
-        skill: Number(u.skill) || 0,
-        mats: u.mats || '',
-        note: u.note || '',
-        by: u.by || '',
-        builtIn: false,
-        corrects: !!(base && base.builtIn),
-      });
-    }
-
-    // Votes hang off whatever the recipe ended up being. A vote for a recipe
-    // that has since been renamed or hidden just doesn't find a home.
-    for (const r of map.values()) r.votes = { works: [], wrong: [] };
-    for (const v of state.votes) {
-      const prof = normProf(v.profession) || String(v.profession || '').trim();
-      const r = map.get(rkey(prof, v.name || ''));
-      if (!r || !String(v.by || '').trim()) continue;
-      (isWrong(v.verdict) ? r.votes.wrong : r.votes.works)
-        .push({ id: v.id, by: String(v.by).trim(), note: v.note || '' });
-    }
-    RX = map;
+  /** The poster's skill in the profession they posted under, if we can tell. */
+  function skillFor(row) {
+    const c = charNamed(row.char);
+    if (!c || !row.prof) return null;
+    const p = profsOf(c).find(x => x.name === row.prof);
+    return p && p.level !== '' ? p : null;
   }
 
-  const isWrong = v => /^(wrong|no|bad|false)$/i.test(String(v || '').trim());
-  /** Confirmed by a real player beats whatever the guides said. */
-  const verified = r => !!(r.votes && r.votes.works.length);
-  const disputed = r => !!(r.votes && r.votes.wrong.length);
-  const myVote = r => {
-    if (!r.votes || !myName) return null;
-    const mine = n => n.by.toLowerCase() === myName.toLowerCase();
-    const yes = r.votes.works.find(mine);
-    if (yes) return { verdict: 'works', row: yes };
-    const no = r.votes.wrong.find(mine);
-    return no ? { verdict: 'wrong', row: no } : null;
-  };
-
-  const recipesFor = prof => [...RX.values()]
-    .filter(r => r.prof === prof)
-    .sort((a, b) => a.skill - b.skill || a.name.localeCompare(b.name));
-  const recipeProfessions = () => [...new Set([...RX.values()].map(r => r.prof))];
-  const skillOf = h => Number(h.p.level) || 0;
-  /** "4x Bolt of Silk Cloth, 2x Red Dye" -> ["Bolt of Silk Cloth", "Red Dye"] */
-  const matsOf = r => String(r.mats || '').split(',')
-    .map(s => s.replace(/^\s*\d+\s*x\s*/i, '').trim()).filter(Boolean);
-
   /**
-   * Tie a line someone wrote in the sheet to a real recipe. An exact name is a
-   * sure thing; otherwise we look for a material they named, which is how
-   * "Peacebloom = Spell Damage potion" finds Minor Arcane Elixir. Loose matches
-   * only count against recipes that character can already make, or every herb
-   * would match half the alchemy book.
+   * Everything the board shows, from the two places a person can type a trade:
+   * a post of their own, or the "what this character can make" lines on their
+   * character card. Clicking a row opens whichever one it came from.
    */
-  function matchNote(text, profs) {
-    const low = text.toLowerCase();
-    const exact = [], loose = [];
-    for (const p of profs) {
-      for (const r of recipesFor(p.name)) {
-        if (low.includes(r.name.toLowerCase())) exact.push({ prof: p.name, r });
-        else if ((Number(p.level) || 0) >= r.skill &&
-                 matsOf(r).some(m => low.includes(m.toLowerCase()))) loose.push({ prof: p.name, r });
+  function boardRows() {
+    const rows = [];
+    for (const post of state.posts) {
+      rows.push({
+        id: post.id || '',
+        char: String(post.char || '').trim(),
+        prof: normProf(post.profession) || String(post.profession || '').trim(),
+        item: String(post.item || '').trim(),
+        mats: String(post.mats || '').trim(),
+        note: String(post.note || '').trim(),
+        by: String(post.by || '').trim(),
+        updated: post.updated || '',
+      });
+    }
+    for (const c of state.chars) {
+      for (const item of tradesOf(c)) {
+        rows.push({
+          id: '', fromCard: c.id, char: c.name, prof: '', item,
+          mats: '', note: '', by: c.player || '', updated: c.updated || '',
+        });
       }
     }
-    return exact.length ? { hits: exact, exact: true } : { hits: loose.slice(0, 3), exact: false };
+    return rows;
   }
 
   const primaryCount = c => profsOf(c)
@@ -211,11 +167,7 @@
       const res = await fetch(SCRIPT_URL);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Load failed');
-      return {
-        characters: data.characters || [],
-        recipes: data.recipes || [],
-        votes: data.votes || [],
-      };
+      return { characters: data.characters || [], posts: data.posts || [] };
     },
     async save(change) {
       // text/plain keeps this a "simple" request, so the browser skips the CORS preflight Apps Script can't answer.
@@ -226,31 +178,25 @@
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Save failed');
-      return {
-        characters: data.characters || null,
-        recipes: data.recipes || null,
-        votes: data.votes || null,
-      };
+      return { characters: data.characters || null, posts: data.posts || null };
     },
   };
 
   const local = {
     async load() {
       const roster = ls.get('wow-roster');
-      let chars;
+      const board = ls.get('wow-posts');
+      let chars, posts;
       try { chars = roster ? JSON.parse(roster) : null; } catch { chars = null; }
-      let recipes, votes;
-      try { recipes = JSON.parse(ls.get('wow-recipes') || '[]'); } catch { recipes = []; }
-      try { votes = JSON.parse(ls.get('wow-votes') || '[]'); } catch { votes = []; }
+      try { posts = board ? JSON.parse(board) : null; } catch { posts = null; }
       return {
         characters: chars || D.SEED.map(c => Object.assign({ id: newId() }, c)),
-        recipes, votes,
+        posts: posts || D.SEED_POSTS.map(x => Object.assign({ id: newId() }, x)),
       };
     },
     async save() {
       ls.set('wow-roster', JSON.stringify(state.chars));
-      ls.set('wow-recipes', JSON.stringify(state.recipes));
-      ls.set('wow-votes', JSON.stringify(state.votes));
+      ls.set('wow-posts', JSON.stringify(state.posts));
       return {};
     },
   };
@@ -262,13 +208,10 @@
     status('Saving…');
     try {
       const fresh = await store.save(Object.assign({
-        upserts: [], deletes: [],
-        recipeUpserts: [], recipeDeletes: [],
-        voteUpserts: [], voteDeletes: [],
+        upserts: [], deletes: [], postUpserts: [], postDeletes: [],
       }, change));
       if (fresh.characters) state.chars = fresh.characters;
-      if (fresh.recipes) state.recipes = fresh.recipes;
-      if (fresh.votes) state.votes = fresh.votes;
+      if (fresh.posts) state.posts = fresh.posts;
       status('Saved.');
       setTimeout(() => { if ($('status').textContent === 'Saved.') status(''); }, 1800);
     } catch (err) {
@@ -283,8 +226,7 @@
     try {
       const data = await store.load();
       state.chars = data.characters.map(c => Object.assign({}, c, { id: c.id || newId() }));
-      state.recipes = data.recipes;
-      state.votes = data.votes || [];
+      state.posts = (data.posts || []).map(x => Object.assign({}, x, { id: x.id || newId() }));
       if (!quiet) status('');
     } catch (err) {
       status('Could not load the roster: ' + err.message);
@@ -470,17 +412,16 @@
     const holders = entry ? entry.holders : [];
     const planners = entry ? entry.planners : [];
     const bestLevel = Math.max(...holders.map(h => Number(h.p.level) || 0), 0);
-
     // Secondaries don't compete for the two primary slots, so "free slots" is
     // only worth saying about a primary profession.
     const freeSlots = !holders.length && meta.kind !== 'secondary'
       ? state.chars.filter(c => primaryCount(c) < 2).slice(0, 4)
       : [];
 
-    const recipes = recipesFor(name);
-    const unlocked = recipes.filter(r => r.skill <= bestLevel).length;
-    const recipeLine = recipes.length
-      ? `<p class="unlocked"><b>${unlocked}</b> of ${recipes.length} tracked recipes unlocked
+    const posted = state.posts.filter(x =>
+      (normProf(x.profession) || String(x.profession || '').trim()) === name);
+    const postLine = posted.length
+      ? `<p class="unlocked"><b>${posted.length}</b> thing${posted.length === 1 ? '' : 's'} on the trade board
            &middot; <a href="#/trades" data-prof="${esc(name)}">see them</a></p>`
       : '';
 
@@ -494,7 +435,7 @@
             ? ` — free slots: ${esc(freeSlots.map(c => c.name).join(', '))}`
             : meta.kind === 'secondary' ? ' — anyone can take it alongside their primaries' : ''}</p>`}
       ${planners.length ? `<p class="pairing planned">Planned by ${esc(planners.map(c => c.name).join(', '))}</p>` : ''}
-      ${recipeLine}
+      ${postLine}
       ${pairingLine(name, meta, idx)}
     </article>`;
   }
@@ -539,179 +480,119 @@
 
   /* ---------- view: trade board ---------- */
 
-  /** Every recipe in a profession someone has, tagged with who can make it. */
-  function board(idx, profs) {
-    const rows = [];
-    for (const prof of profs) {
-      const holders = (idx.get(prof) || { holders: [] }).holders;
-      for (const r of recipesFor(prof)) {
-        const makers = holders.filter(h => skillOf(h) >= r.skill);
-        let closest = null;
-        if (!makers.length && holders.length) {
-          const top = holders.reduce((a, b) => (skillOf(b) > skillOf(a) ? b : a));
-          closest = { c: top.c, gap: r.skill - skillOf(top) };
-        }
-        rows.push({
-          prof, r, makers, closest,
-          status: makers.length ? 'now' : closest && closest.gap <= NEARLY ? 'soon' : 'later',
-        });
-      }
-    }
-    return rows;
-  }
+  // What a group is called when nobody filled that field in.
+  const NOT_SAID = {
+    profession: 'No profession given',
+    char: 'No character given',
+    by: 'Unsigned',
+  };
 
-  /**
-   * What the row says about how much to trust this recipe. Someone saying they
-   * made it in game outranks the "?" the guides earned, and someone saying it's
-   * wrong outranks both.
-   */
-  function voteTag(r) {
-    const v = r.votes || { works: [], wrong: [] };
-    const names = list => list.map(n => n.by).join(', ');
-    if (v.wrong.length) {
-      return `<span class="vote bad" title="${esc(names(v.wrong))} couldn’t make this as written">
-        ⚠ ${v.wrong.length} say${v.wrong.length === 1 ? 's' : ''} wrong</span>`;
-    }
-    if (v.works.length) {
-      return `<span class="vote good" title="Confirmed in game by ${esc(names(v.works))}">
-        ✓ confirmed${v.works.length > 1 ? ' ×' + v.works.length : ''}</span>`;
-    }
-    return r.unconfirmed
-      ? '<span class="tier" title="The guides still list this step as untested — nobody has confirmed it">?</span>'
-      : '';
-  }
+  function tradeRow(row, hideChar) {
+    const meta = D.PROFESSIONS[row.prof] || {};
+    const c = charNamed(row.char);
+    const skill = skillFor(row);
+    const who = [
+      row.char && !hideChar
+        ? `<b style="--cc:${esc((c && classColor(c.class)) || '#e6e9ef')}">${esc(row.char)}</b>`
+        : '',
+      row.by && row.by.toLowerCase() !== String(row.char).toLowerCase() ? esc(row.by) : '',
+    ].filter(Boolean).join(' <span class="sep">&middot;</span> ');
 
-  function recipeRow(row, noted) {
-    const { r, prof, makers, closest, status } = row;
-    const meta = D.PROFESSIONS[prof] || {};
-    const who = makers.length
-      ? makers.map(h => `<b style="--cc:${esc(classColor(h.c.class) || '#e6e9ef')}">${esc(h.c.name)}</b> ${skillOf(h)}`).join(', ')
-      : closest ? `${esc(closest.c.name)} is ${closest.gap} away`
-      : 'nobody has ' + esc(prof);
-    const credit = r.builtIn ? ''
-      : `<span class="by-tag" title="${r.corrects ? 'Corrected' : 'Added'} by hand, not from the built-in list">${
-          r.corrects ? 'fixed' : 'added'}${r.by ? ' by ' + esc(r.by) : ''}</span>`;
-    return `<div class="recipe ${status}" data-recipe="${esc(rkey(prof, r.name))}"${canWrite() ? ' title="Click to edit or confirm this recipe"' : ''}>
-      <span class="rname">
-        ${esc(r.name)}
-        ${voteTag(r)}
-        ${credit}
-        ${noted ? '<span class="noted" title="Someone wrote this in the sheet">★</span>' : ''}
-      </span>
-      <span class="rskill">${meta.icon || ''} ${r.skill}</span>
-      <span class="rmats">${esc(r.mats)}${r.note ? ` <em>— ${esc(r.note)}</em>` : ''}</span>
-      <span class="rwho">${who}</span>
+    // Open the post, or the character card the line was typed on.
+    const target = row.id ? ` data-post="${esc(row.id)}"` : ` data-id="${esc(row.fromCard)}"`;
+    const hint = row.id ? 'Click to edit this trade' : 'Typed on this character’s card — click to edit it there';
+
+    return `<div class="post"${target}${canWrite() ? ` title="${hint}"` : ''}>
+      <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}${
+        row.id ? '' : '<span class="from-card" title="From this character’s own card">card</span>'}</span>
+      <span class="pwho">${who || '<em>nobody said who</em>'}${
+        skill ? `<small>${esc(row.prof)} ${skill.level}</small>` : ''}</span>
+      ${row.mats ? `<span class="pmats">You bring: ${esc(row.mats)}</span>` : '<span class="pmats"></span>'}
+      ${row.note ? `<span class="pnote">${esc(row.note)}</span>` : ''}
     </div>`;
   }
 
   function renderTrades() {
-    const idx = professionIndex();
     const ui = state.ui;
-    const all = recipeProfessions();
-    const ours = all.filter(p => (idx.get(p) || { holders: [] }).holders.length);
-    const profs = ui.tprof ? [ui.tprof] : (ours.length ? ours : all);
-    const rows = board(idx, profs);
-
-    // Lines people wrote in the sheet, tied back to real recipes where we can.
-    const notes = [];
-    const notedKeys = new Set();
-    for (const c of state.chars) {
-      const cp = profsOf(c);
-      for (const text of tradesOf(c)) {
-        const m = matchNote(text, cp);
-        m.hits.forEach(h => notedKeys.add(h.prof + '|' + h.r.name));
-        notes.push({ c, text, m });
-      }
-    }
-
-    const counts = {
-      now: rows.filter(r => r.status === 'now').length,
-      soon: rows.filter(r => r.status === 'soon').length,
-      confirmed: rows.filter(r => verified(r.r)).length,
-      disputed: rows.filter(r => disputed(r.r)).length,
-    };
-    // "Needs checking" is the useful subset: things someone could go and
-    // confirm in game now, that nobody has confirmed yet.
-    const inReach = row => row.status === 'now' || row.status === 'soon';
-    const needsCheck = row => inReach(row) && !verified(row.r);
-    const passes = row => ui.tshow === 'check' ? needsCheck(row)
-      : ({ now: ['now'], soon: ['now', 'soon'], all: ['now', 'soon', 'later'] }[ui.tshow] || ['now'])
-        .includes(row.status);
+    const all = boardRows();
+    const profs = [...new Set(all.map(r => r.prof).filter(Boolean))].sort();
 
     const q = ui.tq.toLowerCase();
-    const list = rows
-      .filter(passes)
-      .filter(r => !q || (r.r.name + ' ' + r.r.mats + ' ' + r.prof + ' ' +
-        r.makers.map(h => h.c.name).join(' ')).toLowerCase().includes(q));
+    const list = all
+      .filter(r => !ui.tprof || r.prof === ui.tprof)
+      .filter(r => !q || [r.item, r.mats, r.note, r.char, r.by, r.prof]
+        .join(' ').toLowerCase().includes(q));
 
     const stats = `<div class="stats">
-      <div class="stat"><b>${counts.now}</b><span>Can make now</span></div>
-      <div class="stat"><b>${counts.soon}</b><span>Nearly there</span></div>
-      <div class="stat"><b>${counts.confirmed}</b><span>Confirmed in game</span></div>
-      <div class="stat"><b>${rows.length}</b><span>Recipes tracked</span></div>
+      <div class="stat"><b>${all.length}</b><span>Trades posted</span></div>
+      <div class="stat"><b>${new Set(all.map(r => r.char.toLowerCase()).filter(Boolean)).size}</b><span>Characters offering</span></div>
+      <div class="stat"><b>${profs.length}</b><span>Professions</span></div>
+      <div class="stat"><b>${new Set(all.map(r => r.by.toLowerCase()).filter(Boolean)).size}</b><span>Players</span></div>
     </div>`;
 
     const toolbar = `<div class="toolbar">
-      <input type="search" id="tq" placeholder="Search recipes…" value="${esc(ui.tq)}">
-      <select id="tprof">
-        <option value=""${ui.tprof ? '' : ' selected'}>Professions we have</option>
-        ${all.map(p => `<option value="${esc(p)}"${ui.tprof === p ? ' selected' : ''}>${esc(p)}</option>`).join('')}
+      <input type="search" id="tq" placeholder="Search trades…" value="${esc(ui.tq)}">
+      <select id="tgroup">
+        ${[['profession', 'Group by profession'], ['char', 'Group by character'],
+           ['by', 'Group by player'], ['new', 'Newest first']]
+          .map(([k, label]) => `<option value="${k}"${ui.tgroup === k ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      ${canWrite() ? '<button id="addRecipe">+ Recipe</button>' : ''}
+      ${canWrite() ? '<button id="addPost" class="primary">+ Post a trade</button>' : ''}
       <span class="spacer"></span>
       <div class="chips">
-        ${[['now', 'Can make now'], ['soon', 'Nearly there'], ['check', 'Needs checking'], ['all', 'Everything']]
-          .map(([k, label]) => `<button class="chip${ui.tshow === k ? ' on' : ''}" data-show="${k}">${label}</button>`).join('')}
+        <button class="chip${ui.tprof ? '' : ' on'}" data-prof-filter="">Everything</button>
+        ${profs.map(p => `<button class="chip${ui.tprof === p ? ' on' : ''}" data-prof-filter="${esc(p)}">${
+          (D.PROFESSIONS[p] || {}).icon || ''} ${esc(p)}</button>`).join('')}
       </div>
     </div>`;
 
-    const noteBlock = notes.length ? `
-      <h2 class="section-title">From the sheet</h2>
-      <div class="trades">${notes.map(n => {
-        const color = classColor(n.c.class);
-        const hits = n.m.hits.map(h => `${D.PROFESSIONS[h.prof].icon} ${esc(h.r.name)}`).join(', ');
-        return `<div class="trade" data-id="${esc(n.c.id)}" style="--cc:${esc(color || '#2c3645')}">
-          <span class="what">${esc(n.text)}</span>
-          <span class="by"><b>${esc(n.c.name)}</b>${n.c.player ? ' &middot; ' + esc(n.c.player) : ''}</span>
-          ${hits ? `<span class="via">${n.m.exact ? '' : 'probably '}${hits}</span>`
-                 : '<span class="via">no matching recipe — kept as a note</span>'}
-        </div>`;
-      }).join('')}</div>` : '';
-
     if (!list.length) {
-      const nothing = ui.tshow === 'check' && rows.length
-        ? 'Everything within reach has been confirmed in game. Nice.'
-        : rows.length ? 'Nothing matches that.'
-        : 'No recipes for these professions yet — add one with + Recipe.';
-      return stats + toolbar + noteBlock + `<p class="empty">${nothing}</p>`;
+      const nothing = all.length
+        ? 'Nothing matches that.'
+        : canWrite()
+          ? 'No trades yet. Click <b>+ Post a trade</b> to put the first one up.'
+          : 'No trades yet.';
+      return stats + toolbar + `<p class="empty">${nothing}</p>`;
     }
 
-    // Group what's left by profession, in the order the professions page uses.
+    if (ui.tgroup === 'new') {
+      const sorted = [...list].sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+      return stats + toolbar + `<div class="posts">${sorted.map(tradeRow).join('')}</div>`;
+    }
+
+    const blank = NOT_SAID[ui.tgroup];
+    const keyOf = r => (ui.tgroup === 'char' ? r.char : ui.tgroup === 'by' ? r.by : r.prof) || blank;
     const groups = new Map();
-    for (const row of list) {
-      if (!groups.has(row.prof)) groups.set(row.prof, []);
-      groups.get(row.prof).push(row);
+    for (const r of list) {
+      const k = keyOf(r);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
     }
-    const body = [...groups.entries()].map(([prof, rs]) => {
-      const meta = D.PROFESSIONS[prof] || {};
-      const holders = (idx.get(prof) || { holders: [] }).holders;
-      const best = Math.max(0, ...holders.map(skillOf));
-      return `<div class="playerhead">
-          <h2>${meta.icon || ''} ${esc(prof)}</h2>
-          <span class="count">${holders.length ? `best skill ${best}` : 'nobody has this yet'}
-            &middot; ${rs.length} shown</span>
-        </div>
-        <div class="recipes">${rs.sort((a, b) => a.r.skill - b.r.skill)
-          .map(row => recipeRow(row, notedKeys.has(row.prof + '|' + row.r.name))).join('')}</div>`;
-    }).join('');
 
-    return stats + toolbar + noteBlock + body;
+    const body = [...groups.entries()]
+      // Biggest group first, with the ones nobody labelled at the bottom.
+      .sort((a, b) => (a[0] === blank) - (b[0] === blank) ||
+        b[1].length - a[1].length || String(a[0]).localeCompare(String(b[0])))
+      .map(([k, rs]) => {
+        const icon = ui.tgroup === 'profession' ? ((D.PROFESSIONS[k] || {}).icon || '') : '';
+        const c = ui.tgroup === 'char' ? charNamed(k) : null;
+        const color = c ? classColor(c.class) : '';
+        const sub = c
+          ? [c.player, c.level ? 'Lv ' + c.level : ''].filter(Boolean).join(' · ')
+          : `${rs.length} trade${rs.length === 1 ? '' : 's'}`;
+        return `<div class="playerhead">
+            <h2${color ? ` style="color:${esc(color)}"` : ''}>${icon ? icon + ' ' : ''}${esc(k)}</h2>
+            <span class="count">${esc(sub)}</span>
+          </div>
+          <div class="posts">${rs.map(r => tradeRow(r, ui.tgroup === 'char')).join('')}</div>`;
+      }).join('');
+
+    return stats + toolbar + body;
   }
 
   /* ---------- render & routing ---------- */
 
   function render() {
-    rebuildRecipes();
     const view = $('view');
     document.querySelectorAll('.tabs a').forEach(a =>
       a.classList.toggle('on', a.dataset.tab === state.route));
@@ -739,6 +620,7 @@
         .map(v => `<option value="${esc(v)}">`).join('');
     };
     set('players', state.chars.map(c => c.player).sort());
+    set('chars', state.chars.map(c => c.name).sort());
     set('races', D.RACES);
     set('classes', Object.keys(D.CLASSES));
     set('professions', Object.keys(D.PROFESSIONS));
@@ -779,10 +661,6 @@
       else if (t.canTrain) bits.push(`${t.name} — can train ${t.canTrain.name} at level ${t.canTrain.level}`);
       else if (t.next) bits.push(`${t.name} — train ${t.next.name} at ${t.next.trainAt}`);
       else bits.push(`${t.name}, cap ${t.goal}`);
-    }
-    const known = recipesFor(key);
-    if (known.length) {
-      bits.push(`${known.filter(r => r.skill <= (Number(level) || 0)).length}/${known.length} tracked recipes`);
     }
     if (meta.needs) {
       const holders = state.chars.filter(c => profsOf(c).some(p => p.name === meta.needs));
@@ -845,158 +723,79 @@
   document.querySelectorAll('dialog .cancel').forEach(b =>
     b.addEventListener('click', () => b.closest('dialog').close('cancel')));
 
-  /* ---------- recipe dialog ---------- */
+  /* ---------- post dialog ---------- */
 
-  const rdlg = $('recipeDialog');
-  const rform = $('recipeForm');
+  const rdlg = $('postDialog');
+  const rform = $('postForm');
 
-  function openRecipe(r) {
-    const blank = { id: '', was: '', profession: state.ui.tprof || '', name: '', skill: '', mats: '', note: '', by: myName };
-    const data = r ? {
-      id: r.id || '', was: rkey(r.prof, r.name),
-      profession: r.prof, name: r.name, skill: r.skill || '',
-      mats: r.mats || '', note: r.note || '', by: r.by || myName,
-    } : blank;
+  function openPost(post) {
+    const blank = {
+      id: '', char: '', profession: state.ui.tprof || '',
+      item: '', mats: '', note: '', by: myName,
+    };
+    const data = Object.assign({}, blank, post || {});
     for (const k of Object.keys(blank)) if (rform[k]) rform[k].value = data[k] ?? '';
 
-    $('recipeTitle').textContent = r ? r.name : 'New recipe';
-    $('recipeLead').textContent = !r
-      ? 'This goes in the sheet, so everyone sees it.'
-      : r.builtIn
-        ? 'This one ships with the site, from a beta guide. Saving writes a correction to the sheet that replaces it for everyone.'
-        : 'Added by hand. Saving updates it for everyone.';
-    $('removeRecipe').hidden = !r;
-    $('removeRecipe').textContent = r && r.builtIn ? 'Hide it' : (r && r.corrects ? 'Undo the fix' : 'Remove');
-    renderVoteBox(r);
+    $('postTitle').textContent = post ? 'Edit trade' : 'Post a trade';
+    $('removePost').hidden = !post;
+    postHint();
     rdlg.showModal();
-    rform.name.focus();
+    (post ? rform.item : rform.char).focus();
   }
 
-  function renderVoteBox(r) {
-    $('voteBox').hidden = !r;
-    if (!r) return;
-    const v = r.votes || { works: [], wrong: [] };
-    const said = [];
-    if (v.works.length) said.push(`${v.works.map(n => n.by).join(', ')} made it`);
-    if (v.wrong.length) said.push(`${v.wrong.map(n => n.by).join(', ')} couldn’t`);
-    const mine = myVote(r);
-    $('voteState').textContent = said.join(' · ') || 'Nobody has checked this one in game yet.';
-    $('voteClear').hidden = !mine;
-    $('voteWorks').classList.toggle('on', !!mine && mine.verdict === 'works');
-    $('voteWrong').classList.toggle('on', !!mine && mine.verdict === 'wrong');
-  }
-
-  function castVote(verdict) {
-    const r = RX.get(rform.was.value);
-    if (!r) return;
-    const by = rform.by.value.trim();
-    if (!by) {
-      $('voteState').textContent = 'Put your name in first, so people know who checked it.';
-      rform.by.focus();
+  /** Say what we know about the character they named, so typos are obvious. */
+  function postHint() {
+    const name = rform.char.value.trim();
+    const hint = $('postHint');
+    if (!name) { hint.className = 'hint'; hint.textContent = 'Leave blank if it isn’t tied to one character.'; return; }
+    const c = charNamed(name);
+    if (!c) {
+      hint.className = 'hint warn';
+      hint.textContent = `No character called “${name}” on the roster — the trade still posts.`;
       return;
     }
-    myName = by;
-    ls.set('wow-who', myName);
-
-    const mine = myVote(r);   // matches on myName, which we just set
-    const row = {
-      id: (mine && mine.row.id) || newId(),
-      profession: r.prof, name: r.name, by, verdict, note: '',
-    };
-    const i = state.votes.findIndex(x => x.id === row.id);
-    if (i >= 0) state.votes[i] = row; else state.votes.push(row);
-
-    rdlg.close();
-    render();
-    saveChanges({ voteUpserts: [row] });
+    const profs = profsOf(c).map(p => `${p.icon} ${p.name}${p.level === '' ? '' : ' ' + p.level}`);
+    hint.className = 'hint';
+    hint.textContent = [c.player, c.class, profs.join(' · ')].filter(Boolean).join(' · ');
   }
-
-  $('voteWorks').addEventListener('click', () => castVote('works'));
-  $('voteWrong').addEventListener('click', () => castVote('wrong'));
-  $('voteClear').addEventListener('click', () => {
-    const r = RX.get(rform.was.value);
-    const mine = r && myVote(r);
-    if (!mine) return;
-    state.votes = state.votes.filter(x => x.id !== mine.row.id);
-    rdlg.close();
-    render();
-    saveChanges({ voteDeletes: [mine.row.id] });
-  });
-
-  /** Every vote row pointing at a recipe, by id. */
-  const votesOn = r => state.votes.filter(v =>
-    rkey(normProf(v.profession) || String(v.profession || '').trim(), v.name || '') === rkey(r.prof, r.name));
-
-  /** A row that hides a built-in recipe rather than replacing it. */
-  const hideRow = (r, by) => ({
-    id: newId(), profession: r.prof, name: r.name,
-    skill: r.skill || '', mats: r.mats || '', note: r.note || '',
-    removed: 'yes', by: by || '',
-  });
 
   rform.addEventListener('submit', e => {
     e.preventDefault();
     const o = {};
     new FormData(rform).forEach((v, k) => { o[k] = typeof v === 'string' ? v.trim() : v; });
-    if (!o.profession || !o.name) return;
-    o.profession = normProf(o.profession) || o.profession;
+    if (!o.item) return;
     o.id = o.id || newId();
-    o.removed = '';
+    o.profession = normProf(o.profession) || o.profession;
+    // The sheet stamps this itself; set it here so "newest first" also works
+    // in preview mode, where there is no sheet.
+    o.updated = new Date().toISOString();
+    // A character that is on the roster gets stored under its exact spelling,
+    // so the board can tie the trade back to them later.
+    const c = charNamed(o.char);
+    if (c) o.char = c.name;
     myName = o.by;
     ls.set('wow-who', myName);
 
-    const upserts = [o];
-    const was = rform.was.value;
-    const prev = was ? RX.get(was) : null;
-
-    // Renaming a correction would leave the original built-in showing as well,
-    // so hide the one we were editing.
-    if (was && was !== rkey(o.profession, o.name) && prev && prev.builtIn) {
-      upserts.push(hideRow(prev, o.by));
-    }
-
-    // Votes confirm a specific skill and material list. Change either and the
-    // old confirmations no longer mean anything, so the recipe goes back to
-    // unchecked rather than carrying a ✓ it didn't earn.
-    const edited = prev && (String(prev.skill) !== String(o.skill) ||
-      (prev.mats || '') !== (o.mats || '') ||
-      rkey(prev.prof, prev.name) !== rkey(o.profession, o.name));
-    const voteDeletes = edited ? votesOn(prev).map(v => v.id).filter(Boolean) : [];
-    if (voteDeletes.length) {
-      state.votes = state.votes.filter(v => !voteDeletes.includes(v.id));
-    }
-
-    const i = state.recipes.findIndex(x => x.id === o.id);
-    if (i >= 0) state.recipes[i] = o; else state.recipes.push(o);
-    upserts.slice(1).forEach(row => state.recipes.push(row));
+    const i = state.posts.findIndex(x => x.id === o.id);
+    if (i >= 0) state.posts[i] = Object.assign({}, state.posts[i], o);
+    else state.posts.push(o);
 
     rdlg.close();
     render();
-    saveChanges({ recipeUpserts: upserts, voteDeletes });
+    saveChanges({ postUpserts: [o] });
   });
 
-  $('removeRecipe').addEventListener('click', () => {
-    const r = RX.get(rform.was.value);
-    if (!r) return;
-    const ask = r.builtIn
-      ? `Hide ${r.name} from the board for everyone?`
-      : r.corrects ? `Drop your changes to ${r.name} and go back to the built-in one?`
-      : `Remove ${r.name}? This deletes its row from the sheet.`;
-    if (!confirm(ask)) return;
-
-    if (r.builtIn) {
-      const row = hideRow(r, myName);
-      state.recipes.push(row);
-      rdlg.close();
-      render();
-      saveChanges({ recipeUpserts: [row] });
-    } else {
-      state.recipes = state.recipes.filter(x => x.id !== r.id);
-      rdlg.close();
-      render();
-      saveChanges({ recipeDeletes: [r.id] });
-    }
+  $('removePost').addEventListener('click', () => {
+    const id = rform.id.value;
+    const post = state.posts.find(x => x.id === id);
+    if (!post || !confirm(`Take “${post.item}” off the board?`)) return;
+    state.posts = state.posts.filter(x => x.id !== id);
+    rdlg.close();
+    render();
+    saveChanges({ postDeletes: [id] });
   });
+
+  rform.char.addEventListener('input', postHint);
 
   /* ---------- write key ---------- */
 
@@ -1034,25 +833,25 @@
   $('addBtn').addEventListener('click', () => openChar(null));
 
   $('view').addEventListener('click', e => {
-    if (e.target.id === 'addRecipe') return openRecipe(null);
+    if (e.target.id === 'addPost') return openPost(null);
 
-    const rec = e.target.closest('[data-recipe]');
-    if (rec) {
+    const hit = e.target.closest('[data-post]');
+    if (hit) {
       if (!canWrite()) return;
-      const r = RX.get(rec.dataset.recipe);
-      if (r) openRecipe(r);
+      const post = state.posts.find(x => x.id === hit.dataset.post);
+      if (post) openPost(post);
       return;
     }
 
     const chip = e.target.closest('.chip');
     if (chip) {
-      if (chip.dataset.show) state.ui.tshow = chip.dataset.show;
+      if (chip.dataset.profFilter != null) state.ui.tprof = chip.dataset.profFilter;
       else state.ui.player = chip.dataset.player;
       return render();
     }
-    // "see them" on a profession card jumps to that profession's recipes.
+    // "see them" on a profession card jumps to that profession's trades.
     const seeAll = e.target.closest('[data-prof]');
-    if (seeAll) { state.ui.tprof = seeAll.dataset.prof; state.ui.tshow = 'all'; return; }
+    if (seeAll) { state.ui.tprof = seeAll.dataset.prof; return; }
 
     const row = e.target.closest('[data-id]');
     if (row && canWrite()) {
@@ -1080,7 +879,7 @@
 
   $('view').addEventListener('change', e => {
     if (e.target.id === 'group') { state.ui.group = e.target.value; render(); }
-    if (e.target.id === 'tprof') { state.ui.tprof = e.target.value; render(); }
+    if (e.target.id === 'tgroup') { state.ui.tgroup = e.target.value; render(); }
   });
 
   window.addEventListener('hashchange', route);

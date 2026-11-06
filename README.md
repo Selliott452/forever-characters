@@ -13,49 +13,36 @@ a Google Sheet through a small Apps Script web app.
   grouped by player (or by class, or sorted by level). Search and filter by player.
 - **Professions** — the part worth having. For every profession: who has it, their skill
   rank and progress towards that rank's cap, a star on the group's best crafter, how many
-  tracked recipes they've unlocked, and whether the profession that supplies it is covered
+  trades are posted for it, and whether the profession that supplies it is covered
   by anyone. Professions nobody has are listed separately, with the characters who still
   have a free slot.
-- **Trade board** — the actual recipe list, 1-300, filtered against the group's real
-  skill levels. **Can make now** is what someone can craft today, with who and at what
-  skill; **Nearly there** is everything within 25 skill of somebody; **Everything** is
-  the full book. Each row shows the skill needed and the materials for one craft.
-  Lines people wrote in the sheet appear under *From the sheet* and are matched back to
-  real recipes — "Peacebloom = Spell Damage potion" finds Minor Arcane Elixir — and the
-  recipes they matched get a ★.
+- **Trade board** — a board of trades people have posted: *I can craft this, bring
+  me that*. Nothing on it is generated or fetched — every line is there because
+  somebody typed it. Each trade carries the character who makes it, the
+  profession, what to bring, a note and who to ask. Group it by profession,
+  character or player, or sort newest first, and filter to one profession with
+  the chips.
 
 Professions parse loosely: `Herblore`, `herb` and `Herbalism` all count as Herbalism,
 and a skill of `22?` reads as 22. Anything it doesn't recognise is kept and shown as
 typed, so nothing you write in the sheet gets lost.
 
-## The recipes
+## Posting a trade
 
-`recipes.js` holds the 1-300 route for each crafting profession — 121 recipes with the
-skill they unlock at and the materials for one craft. That file is the baseline; the
-group edits the list from the site itself:
+**+ Post a trade** on the board puts one up; clicking a trade opens it again to
+edit, or to **take it down**. The only required field is what you can craft —
+everything else is optional, so "Portals to Ironforge" with nothing else filled in
+is a perfectly good post.
 
-- **+ Recipe** on the trade board adds one.
-- **Clicking any recipe** opens it for editing. Correcting a built-in writes a row to the
-  sheet's `Recipes` tab that replaces it for everyone, tagged *fixed by <name>*; one you
-  added shows as *added by <name>*.
-- **Hide it** removes a built-in recipe that turned out not to exist. **Undo the fix** on
-  a correction drops it and brings the original back.
-- **Have you made it?** in the same dialog is the vote: *It works* or *It's wrong*, one
-  per person. A confirmed recipe shows **✓ confirmed** and clears its **?**; a disputed
-  one shows **⚠ 1 says wrong** so nobody wastes materials on it. The **Needs checking**
-  filter lists what's in reach of someone's skill but nobody has confirmed — a to-do list
-  for the next time you're near a trainer.
+If you name a character who's on the roster, the board shows their skill in that
+profession next to the trade, so people can see it's the maxed Tailor and not the
+level 3 alt. Name one who isn't on the roster and it posts anyway.
 
-Editing a recipe's skill or materials clears its votes, since a confirmation of the old
-numbers says nothing about the new ones.
+The **What this character can make** lines on a character's own card show up on
+the board too, tagged `CARD`; clicking one opens that character rather than a
+post. Both are just text somebody typed — use whichever you prefer.
 
-So nobody has to touch code to fix a wrong skill number — which matters, because:
-
-Forever launched on 4 November 2026, so this data comes from community guides written
-during the beta rather than from anything official. Steps past skill 225 are the ones
-those guides still mark untested; the site shows them with a **?** so nobody plans a
-shopping trip around a number that might move. Sources are listed at the top of
-`recipes.js` — spot-check anything you're about to spend real gold on.
+Your name is remembered in your browser so you only type it once.
 
 Forever's professions differ from Classic's in ways the site already accounts for:
 nine primaries with no Jewelcrafting or Inscription, Enchanting both gathers and crafts,
@@ -85,7 +72,8 @@ around without touching the sheet.
 2. **Extensions → Apps Script**, delete the sample code and paste in `apps-script/Code.gs`.
 3. Run `setup()` once. Approve the permissions prompt, then open **View → Logs** and copy
    the write token it printed.
-4. Optionally run `seedRoster()` to fill an empty sheet with the starting roster.
+4. Optionally run `seedRoster()` to fill empty tabs with the starting roster and
+   one example trade.
 5. **Deploy → New deployment → Web app**, with *Execute as: Me* and
    *Who has access: Anyone*. Copy the `/exec` URL.
 6. Put that URL in `config.js` as `scriptUrl`, then commit and push.
@@ -112,30 +100,20 @@ the files as-is.
 | `professionMax` | profession skill cap (default 300); also decides which skill ranks exist |
 | `realm` | optional label shown next to the title |
 
-Classes, races, specs, professions and the skill ranks live in `data.js`; the recipes
-live in `recipes.js`. The lists are only suggestions — every field accepts free text, so
-odd combinations and jokes like "AH Bot" work fine.
+Classes, races, specs, professions and the skill ranks live in `data.js`. The lists are
+only suggestions — every field accepts free text, so odd combinations and jokes like
+"AH Bot" work fine.
 
 ## The sheet
 
-Three tabs. `Recipes` holds what the group added or corrected, and starts empty — the
-built-in list covers the basics:
+Two tabs. `Posts` is the trade board, one row per trade:
 
 ```
-id | profession | name | skill | mats | note | removed | by | updated
+id | char | profession | item | mats | note | by | updated
 ```
 
-A row here replaces the built-in recipe with the same profession and name; `removed` set
-to `yes` hides it instead.
-
-`Votes` is one row per person per recipe:
-
-```
-id | profession | name | by | verdict | note | updated
-```
-
-`verdict` is `works` or `wrong`. Editing by hand in the sheet works just as well as
-editing on the site, on either tab.
+Only `item` is required. Editing by hand in the sheet works just as well as editing
+on the site, on either tab.
 
 `Roster` has one row per character:
 

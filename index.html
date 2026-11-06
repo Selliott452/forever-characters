@@ -111,56 +111,44 @@ Peacebloom = Spell Damage potion"></textarea>
   </form>
 </dialog>
 
-<!-- Add / correct a recipe -->
-<dialog id="recipeDialog">
-  <form id="recipeForm">
-    <h2 id="recipeTitle">Recipe</h2>
-    <p id="recipeLead"></p>
+<!-- Post a trade -->
+<dialog id="postDialog">
+  <form id="postForm">
+    <h2 id="postTitle">Post a trade</h2>
 
     <input type="hidden" name="id">
-    <input type="hidden" name="was">
 
-    <div class="grid recipegrid">
-      <label>Profession
-        <input name="profession" list="professions" required autocomplete="off">
-      </label>
-      <label>Unlocks at skill
-        <input name="skill" type="number" min="1" max="1000" inputmode="numeric" required>
-      </label>
-    </div>
-
-    <label>Recipe name
-      <input name="name" required autocomplete="off" spellcheck="false" placeholder="e.g. Linen Bag">
+    <label>What you can craft
+      <input name="item" required autocomplete="off" spellcheck="false" placeholder="e.g. 6 slot bag">
     </label>
 
-    <label>Materials for one craft
-      <input name="mats" autocomplete="off" placeholder="e.g. 3x Bolt of Linen Cloth, 1x Coarse Thread">
+    <div class="grid postgrid">
+      <label>Which character
+        <input name="char" list="chars" autocomplete="off" placeholder="who makes it">
+      </label>
+      <label>Profession
+        <input name="profession" list="professions" autocomplete="off" placeholder="optional">
+      </label>
+      <p class="hint" id="postHint"></p>
+    </div>
+
+    <label>What to bring
+      <input name="mats" autocomplete="off" placeholder="e.g. 6x Linen Cloth, or “I have the mats”">
     </label>
 
     <label>Note
-      <input name="note" autocomplete="off" placeholder="e.g. pattern drops in Deadmines">
+      <input name="note" autocomplete="off" placeholder="e.g. free for the group, whisper me">
     </label>
 
     <label>Your name
       <input name="by" list="players" autocomplete="off" placeholder="so people know who to ask">
     </label>
 
-    <fieldset id="voteBox" hidden>
-      <legend>Have you made it?</legend>
-      <p class="hint" id="voteState"></p>
-      <div class="votebtns">
-        <button type="button" id="voteWorks">✓ It works</button>
-        <button type="button" id="voteWrong">⚠ It's wrong</button>
-        <button type="button" id="voteClear" hidden>Remove my vote</button>
-      </div>
-      <p class="hint">Confirming clears the <b>?</b> on a recipe the guides never verified.</p>
-    </fieldset>
-
     <menu>
-      <button type="button" id="removeRecipe" class="danger" hidden>Remove</button>
+      <button type="button" id="removePost" class="danger" hidden>Take it down</button>
       <span class="spacer"></span>
       <button type="button" class="cancel">Cancel</button>
-      <button type="submit" class="primary">Save</button>
+      <button type="submit" class="primary">Post it</button>
     </menu>
   </form>
 </dialog>
@@ -179,6 +167,7 @@ Peacebloom = Spell Damage potion"></textarea>
 </dialog>
 
 <datalist id="players"></datalist>
+<datalist id="chars"></datalist>
 <datalist id="races"></datalist>
 <datalist id="classes"></datalist>
 <datalist id="specs"></datalist>
@@ -186,7 +175,6 @@ Peacebloom = Spell Damage potion"></textarea>
 
 <script src="config.js"></script>
 <script src="data.js"></script>
-<script src="recipes.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
