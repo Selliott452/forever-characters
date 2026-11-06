@@ -13,8 +13,8 @@ a Google Sheet through a small Apps Script web app.
   grouped by player (or by class, or sorted by level). Search and filter by player.
 - **Professions** — the part worth having. For every profession: who has it, their skill
   rank and progress towards that rank's cap, a star on the group's best crafter, and how
-  many trades are posted for it. Professions nobody has are listed separately, with the
-  characters who still have a free slot.
+  many trades are posted for it. Professions nobody has are listed under their own
+  heading.
 - **Trade board** — a board of trades people have posted: *I can craft this, bring
   me that*. Nothing on it is generated or fetched — every line is there because
   somebody typed it. Each trade carries the character who makes it, the

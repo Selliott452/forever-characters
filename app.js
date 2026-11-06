@@ -157,9 +157,6 @@
     return rows;
   }
 
-  const primaryCount = c => profsOf(c)
-    .filter(p => p.kind === 'gathering' || p.kind === 'crafting' || p.kind === 'unknown').length;
-
   /* ---------- storage: Google Sheet via Apps Script, or this browser ---------- */
 
   const remote = {
@@ -353,16 +350,15 @@
 
   /* ---------- view: professions ---------- */
 
-  /** profession name -> { holders: [...], planners: [...] } across the whole roster. */
+  /** profession name -> { holders: [...] } across the whole roster. */
   function professionIndex() {
     const idx = new Map();
     const touch = name => {
-      if (!idx.has(name)) idx.set(name, { holders: [], planners: [] });
+      if (!idx.has(name)) idx.set(name, { holders: [] });
       return idx.get(name);
     };
     for (const c of state.chars) {
       for (const p of profsOf(c)) touch(p.name).holders.push({ c, p });
-      for (const name of plannedProfs(c)) touch(name).planners.push(c);
     }
     for (const entry of idx.values()) {
       entry.holders.sort((a, b) => (Number(b.p.level) || 0) - (Number(a.p.level) || 0));
@@ -385,13 +381,7 @@
   function profCard(name, entry) {
     const meta = D.PROFESSIONS[name] || { kind: 'unknown', icon: '❓', makes: '' };
     const holders = entry ? entry.holders : [];
-    const planners = entry ? entry.planners : [];
     const bestLevel = Math.max(...holders.map(h => Number(h.p.level) || 0), 0);
-    // Secondaries don't compete for the two primary slots, so "free slots" is
-    // only worth saying about a primary profession.
-    const freeSlots = !holders.length && meta.kind !== 'secondary'
-      ? state.chars.filter(c => primaryCount(c) < 2).slice(0, 4)
-      : [];
 
     const posted = state.posts.filter(x =>
       (normProf(x.profession) || String(x.profession || '').trim()) === name);
@@ -406,10 +396,7 @@
       ${holders.length
         ? `<ul class="holders">${holders.map(h =>
             holderLi(h, holders.length > 1 && bestLevel > 0 && (Number(h.p.level) || 0) === bestLevel)).join('')}</ul>`
-        : `<p class="pairing miss">Nobody has this yet${freeSlots.length
-            ? ` — free slots: ${esc(freeSlots.map(c => c.name).join(', '))}`
-            : meta.kind === 'secondary' ? ' — anyone can take it alongside their primaries' : ''}</p>`}
-      ${planners.length ? `<p class="pairing planned">Planned by ${esc(planners.map(c => c.name).join(', '))}</p>` : ''}
+        : ''}
       ${postLine}
     </article>`;
   }
