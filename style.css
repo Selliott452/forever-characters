@@ -352,7 +352,6 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
 .holders li.best .who::after { content: " \2605"; color: var(--gold); }
 
 .pairing { font-size: 12.5px; margin: 10px 0 0; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); }
-.pairing.ok { color: var(--good); }
 .pairing.miss { color: var(--warn); }
 .pairing.planned { color: var(--warn); }
 

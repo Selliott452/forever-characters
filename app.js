@@ -382,32 +382,7 @@
     </li>`;
   }
 
-  function pairingLine(name, meta, idx) {
-    const out = [];
-    if (meta.needs) {
-      const src = idx.get(meta.needs) || { holders: [], planners: [] };
-      if (src.holders.length) {
-        const who = src.holders.slice(0, 3).map(h => h.c.name).join(', ');
-        out.push(`<p class="pairing ok">${D.PROFESSIONS[meta.needs].icon} ${esc(meta.needs)} covered by ${esc(who)}</p>`);
-      } else if (src.planners.length) {
-        out.push(`<p class="pairing planned">${esc(meta.needs)} only planned, by ${esc(src.planners.map(c => c.name).join(', '))}</p>`);
-      } else {
-        out.push(`<p class="pairing miss">Wants ${esc(meta.needs)} — nobody has it yet</p>`);
-      }
-    } else if (meta.kind === 'crafting' && !meta.gathers) {
-      out.push(`<p class="pairing">No gathering partner — materials come from drops</p>`);
-    }
-    if (meta.feeds) {
-      const fed = meta.feeds.filter(f => (idx.get(f) || { holders: [] }).holders.length);
-      out.push(fed.length
-        ? `<p class="pairing ok">Feeds ${esc(fed.join(', '))}</p>`
-        : `<p class="pairing">Feeds ${esc(meta.feeds.join(', '))} — none taken yet</p>`);
-    }
-    if (meta.gathers) out.push(`<p class="pairing ok">Collects its own materials</p>`);
-    return out.join('');
-  }
-
-  function profCard(name, entry, idx) {
+  function profCard(name, entry) {
     const meta = D.PROFESSIONS[name] || { kind: 'unknown', icon: '❓', makes: '' };
     const holders = entry ? entry.holders : [];
     const planners = entry ? entry.planners : [];
@@ -436,7 +411,6 @@
             : meta.kind === 'secondary' ? ' — anyone can take it alongside their primaries' : ''}</p>`}
       ${planners.length ? `<p class="pairing planned">Planned by ${esc(planners.map(c => c.name).join(', '))}</p>` : ''}
       ${postLine}
-      ${pairingLine(name, meta, idx)}
     </article>`;
   }
 
@@ -469,7 +443,7 @@
 
     const section = (title, names) => names.length
       ? `<h2 class="section-title">${esc(title)}</h2>
-         <div class="profcards">${names.map(n => profCard(n, idx.get(n), idx)).join('')}</div>`
+         <div class="profcards">${names.map(n => profCard(n, idx.get(n))).join('')}</div>`
       : '';
 
     return stats +

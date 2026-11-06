@@ -12,10 +12,9 @@ a Google Sheet through a small Apps Script web app.
 - **Roster** — a card per character with class colour, level, specs and professions,
   grouped by player (or by class, or sorted by level). Search and filter by player.
 - **Professions** — the part worth having. For every profession: who has it, their skill
-  rank and progress towards that rank's cap, a star on the group's best crafter, how many
-  trades are posted for it, and whether the profession that supplies it is covered
-  by anyone. Professions nobody has are listed separately, with the characters who still
-  have a free slot.
+  rank and progress towards that rank's cap, a star on the group's best crafter, and how
+  many trades are posted for it. Professions nobody has are listed separately, with the
+  characters who still have a free slot.
 - **Trade board** — a board of trades people have posted: *I can craft this, bring
   me that*. Nothing on it is generated or fetched — every line is there because
   somebody typed it. Each trade carries the character who makes it, the
