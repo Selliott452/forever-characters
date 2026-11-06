@@ -149,6 +149,7 @@
       char: text('char'),
       prof: normProf(post.profession) || text('profession'),
       item: text('item'),
+      mats: text('mats'),
       note: text('note'),
       by: text('by'),
       updated: post.updated || '',
@@ -421,6 +422,7 @@
       <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}</span>
       <span class="pwho">${who || '<em>nobody said who</em>'}${
         skill ? `<small>${esc(skill)}</small>` : ''}</span>
+      <span class="pmats">${esc(row.mats)}</span>
       ${row.note ? `<span class="pnote">${esc(row.note)}</span>` : ''}
     </div>`;
   }
@@ -433,7 +435,7 @@
     const q = ui.tq.toLowerCase();
     const list = all
       .filter(r => !ui.tprof || r.prof === ui.tprof)
-      .filter(r => !q || [r.item, r.note, r.char, r.by, r.prof]
+      .filter(r => !q || [r.item, r.mats, r.note, r.char, r.by, r.prof]
         .join(' ').toLowerCase().includes(q));
 
     const toolbar = `<div class="toolbar">
@@ -640,7 +642,7 @@
   function openPost(post) {
     const blank = {
       id: '', char: '', profession: state.ui.tprof || '',
-      item: '', note: '', by: myName,
+      item: '', mats: '', note: '', by: myName,
     };
     const data = Object.assign({}, blank, post || {});
     for (const k of Object.keys(blank)) if (rform[k]) rform[k].value = data[k] ?? '';

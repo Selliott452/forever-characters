@@ -22,8 +22,8 @@ a Google Sheet through a small Apps Script web app.
   ones nobody has yet sit at the end of their group with a dashed border.
 - **Service board** — a board of services people have posted: *I can craft this for
   you*. Nothing on it is generated or fetched — every line is there because somebody
-  typed it. Each one carries the character who makes it, the profession, who to ask,
-  and notes. Group it by profession, character or player, or sort newest first, and
+  typed it. Each one carries the character who makes it, the profession, the materials
+  it needs, who to ask, and notes. Group it by profession, character or player, or sort newest first, and
   filter to one profession with the chips.
 
 Professions parse loosely: `Herblore`, `herb` and `Herbalism` all count as Herbalism,
@@ -37,9 +37,9 @@ to **take it down**. The only required field is what you can craft — everythin
 optional, so "Portals to Ironforge" with nothing else filled in is a perfectly good
 post.
 
-**Notes** is where materials go, among anything else: *bring 6 linen cloth*, *I have
-the mats*, *free for the group*, *whisper me after raid*. There's deliberately no
-separate materials field — one free-text line says whatever the job actually needs.
+**Materials** is what the job needs — *6x Linen Cloth*, or *I have the mats*. It shows
+on the board as you wrote it, with no label in front of it. **Notes** is for everything
+else: *free for the group*, *whisper me after raid*.
 
 If you name a character who's on the roster, the board shows their skill in that
 profession next to the service, so people can see it's the maxed Tailor and not the
@@ -121,10 +121,9 @@ Two tabs. `Posts` is the service board, one row per service:
 id | char | profession | item | mats | note | by | updated
 ```
 
-Only `item` is required. `mats` is a leftover from when the form had a separate
-"what to bring" box: nothing writes to it any more, but the column stays so the rows
-written before that keep their text. An update only touches the fields it carries, so
-editing a post on the site won't wipe it. Editing by hand in the sheet works just as well as editing
+Only `item` is required. An update only touches the fields it carries, so a column you
+added by hand, or one the site has stopped collecting, survives an edit from the site
+instead of being blanked. Editing by hand in the sheet works just as well as editing
 on the site, on either tab.
 
 `Roster` has one row per character:
