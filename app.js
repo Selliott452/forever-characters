@@ -58,7 +58,9 @@
 
   // Primaries fill the character's two slots; everyone has every secondary, so
   // each one is a column of its own on the roster and all you set is the skill.
-  const PRIMARIES = Object.keys(D.PROFESSIONS).filter(n => D.PROFESSIONS[n].kind !== 'secondary');
+  // Alphabetical, because this list is only ever a dropdown you scan or type at.
+  const PRIMARIES = Object.keys(D.PROFESSIONS)
+    .filter(n => D.PROFESSIONS[n].kind !== 'secondary').sort();
   const SECONDARIES = Object.keys(D.PROFESSIONS).filter(n => D.PROFESSIONS[n].kind === 'secondary');
   const secKey = name => name.toLowerCase().replace(/[^a-z]/g, '');   // "First Aid" -> "firstaid"
 
