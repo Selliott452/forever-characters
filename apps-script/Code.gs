@@ -8,10 +8,12 @@
  *            Nothing is generated or imported: every row is there because a
  *            person typed it, on the site or straight into the sheet.
  *
- * NOTE: rows are read by position, so the column order here must match the
- * sheet exactly. A `mats` column sat between `item` and `note` until
- * 2026-11-06; delete it from the sheet before pasting this in, or every row
- * shifts one column left.
+ * Rows are read and written by position, so `headers` must match the sheet's
+ * column order exactly. `mats` is a leftover: the site stopped collecting it
+ * on 2026-11-06, when the one Notes line took over, but the column stays so
+ * the rows already written keep their text. Nothing writes to it any more,
+ * and an upsert that leaves a field out keeps whatever the sheet already had
+ * — see toRow_.
  *
  * GET  <url>  -> { ok, characters: [...], posts: [...] }
  * POST <url>  body: { token, upserts, deletes, postUpserts, postDeletes }
@@ -34,7 +36,7 @@ const SHEETS = {
   },
   posts: {
     name: 'Posts',
-    headers: ['id', 'char', 'profession', 'item', 'note', 'by', 'updated'],
+    headers: ['id', 'char', 'profession', 'item', 'mats', 'note', 'by', 'updated'],
     required: ['item'],
     numbers: [],
   },
@@ -117,9 +119,20 @@ function numOrBlank_(v) {
   return digits === '' ? '' : Number(digits);
 }
 
-function toRow_(cfg, c) {
-  return cfg.headers.map(function (h) {
+/**
+ * Build a sheet row from an incoming object, given the row that's there now
+ * (or null for a new one).
+ *
+ * A field the object *doesn't mention* keeps whatever the sheet already had.
+ * That's what lets a column the site no longer collects — `mats` — survive an
+ * edit instead of being blanked. A field it does mention wins, including when
+ * it's an empty string, so clearing a box on the site still clears the cell.
+ */
+function toRow_(cfg, c, prev) {
+  const has = function (k) { return Object.prototype.hasOwnProperty.call(c, k); };
+  return cfg.headers.map(function (h, i) {
     if (h === 'updated') return c.updated || new Date().toISOString();
+    if (!has(h)) return prev && prev[i] != null ? prev[i] : '';
     return c[h] == null ? '' : c[h];
   });
 }
@@ -159,9 +172,10 @@ function applyChanges_(cfg, upserts, deletes) {
       const ok = cfg.required.every(function (f) { return String(c[f] || '').trim(); });
       if (!ok) continue;
       const id = String(c.id || '').trim() || Utilities.getUuid().slice(0, 8);
-      const row = toRow_(cfg, Object.assign({}, c, { id: id, updated: now }));
       const i = index.get(id);
-      if (i != null && !dropped.has(i)) rows[i] = row;
+      const prev = i != null && !dropped.has(i) ? rows[i] : null;
+      const row = toRow_(cfg, Object.assign({}, c, { id: id, updated: now }), prev);
+      if (prev) rows[i] = row;
       else { index.set(id, rows.length); rows.push(row); }
       changed++;
     }

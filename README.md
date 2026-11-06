@@ -118,10 +118,13 @@ profession slots are dropdowns, so those are the whole list.
 Two tabs. `Posts` is the service board, one row per service:
 
 ```
-id | char | profession | item | note | by | updated
+id | char | profession | item | mats | note | by | updated
 ```
 
-Only `item` is required. Editing by hand in the sheet works just as well as editing
+Only `item` is required. `mats` is a leftover from when the form had a separate
+"what to bring" box: nothing writes to it any more, but the column stays so the rows
+written before that keep their text. An update only touches the fields it carries, so
+editing a post on the site won't wipe it. Editing by hand in the sheet works just as well as editing
 on the site, on either tab.
 
 `Roster` has one row per character:
