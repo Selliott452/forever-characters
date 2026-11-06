@@ -41,6 +41,12 @@
   }
   const classColor = raw => (D.CLASSES[normClass(raw)] || {}).color || '';
 
+  // Primaries fill the character's two slots; everyone has every secondary, so
+  // each one is a column of its own on the roster and all you set is the skill.
+  const PRIMARIES = Object.keys(D.PROFESSIONS).filter(n => D.PROFESSIONS[n].kind !== 'secondary');
+  const SECONDARIES = Object.keys(D.PROFESSIONS).filter(n => D.PROFESSIONS[n].kind === 'secondary');
+  const secKey = name => name.toLowerCase().replace(/[^a-z]/g, '');   // "First Aid" -> "firstaid"
+
   function normProf(raw) {
     const s = String(raw || '').trim();
     if (!s) return '';
@@ -77,36 +83,39 @@
 
   /** The professions a character has, as objects the views can render directly. */
   function profsOf(c) {
-    return [[c.prof1, c.prof1Level], [c.prof2, c.prof2Level]]
+    const one = (raw, lvl) => {
+      const name = normProf(raw);
+      const meta = D.PROFESSIONS[name] || {};
+      return {
+        raw: String(raw).trim(),
+        name: name || String(raw).trim(),
+        known: !!name,
+        kind: meta.kind || 'unknown',
+        icon: meta.icon || '❓',
+        needs: meta.needs || null,
+        level: lvl === '' || lvl == null ? '' : Number(lvl),
+        tier: tierOf(lvl),
+      };
+    };
+    const out = [[c.prof1, c.prof1Level], [c.prof2, c.prof2Level]]
       .filter(([name]) => String(name || '').trim())
-      .map(([raw, lvl]) => {
-        const name = normProf(raw);
-        const meta = D.PROFESSIONS[name] || {};
-        return {
-          raw: String(raw).trim(),
-          name: name || String(raw).trim(),
-          known: !!name,
-          kind: meta.kind || 'unknown',
-          icon: meta.icon || '❓',
-          needs: meta.needs || null,
-          level: lvl === '' || lvl == null ? '' : Number(lvl),
-          tier: tierOf(lvl),
-        };
-      });
+      .map(([raw, lvl]) => one(raw, lvl));
+    // A secondary counts as "has it" once there's a skill against it — nobody
+    // wants three empty rows on every card for trades they haven't touched.
+    for (const name of SECONDARIES) {
+      if (Number(c[secKey(name)]) > 0) out.push(one(name, c[secKey(name)]));
+    }
+    return out;
   }
 
   /** Professions named in a character's plan ("drop Skinning for Engineering"). */
   function plannedProfs(c) {
-    const text = String(c.profPlan || '') + ' ' + String(c.notes || '');
+    const text = String(c.notes || '');
     if (!text.trim()) return [];
     const have = new Set(profsOf(c).map(p => p.name));
     return Object.keys(D.PROFESSIONS)
       .filter(p => !have.has(p) && new RegExp('\\b' + p + '\\b', 'i').test(text));
   }
-
-  /** The "what this character can make" lines from a character's own card. */
-  const tradesOf = c => String(c.trades || '')
-    .split(/[\n;]+/).map(s => s.trim()).filter(Boolean);
 
   /* ---------- the trade board ---------- */
 
@@ -127,11 +136,7 @@
     return p && p.level !== '' ? p : null;
   }
 
-  /**
-   * Everything the board shows, from the two places a person can type a trade:
-   * a post of their own, or the "what this character can make" lines on their
-   * character card. Clicking a row opens whichever one it came from.
-   */
+  /** Everything the board shows. One row per post, and that's the lot. */
   function boardRows() {
     const rows = [];
     for (const post of state.posts) {
@@ -145,14 +150,6 @@
         by: String(post.by || '').trim(),
         updated: post.updated || '',
       });
-    }
-    for (const c of state.chars) {
-      for (const item of tradesOf(c)) {
-        rows.push({
-          id: '', fromCard: c.id, char: c.name, prof: '', item,
-          mats: '', note: '', by: c.player || '', updated: c.updated || '',
-        });
-      }
     }
     return rows;
   }
@@ -267,7 +264,6 @@
         ${profs.length ? profs.map(profRow).join('') : '<span class="noprof">No professions yet</span>'}
         ${planned.length ? `<span class="plan">${esc(planned.join(', '))} planned</span>` : ''}
       </div>
-      ${c.profPlan ? `<div class="note">${esc(c.profPlan)}</div>` : ''}
       ${c.notes ? `<div class="note">${esc(c.notes)}</div>` : ''}
     </article>`;
   }
@@ -277,7 +273,7 @@
   function matches(c, q) {
     if (!q) return true;
     const hay = [c.name, c.player, c.race, c.class, c.spec1, c.spec2,
-      c.prof1, c.prof2, c.profPlan, c.notes, c.trades].join(' ').toLowerCase();
+      c.prof1, c.prof2, c.notes].join(' ').toLowerCase();
     return hay.includes(q.toLowerCase());
   }
 
@@ -442,13 +438,8 @@
       row.by && row.by.toLowerCase() !== String(row.char).toLowerCase() ? esc(row.by) : '',
     ].filter(Boolean).join(' <span class="sep">&middot;</span> ');
 
-    // Open the post, or the character card the line was typed on.
-    const target = row.id ? ` data-post="${esc(row.id)}"` : ` data-id="${esc(row.fromCard)}"`;
-    const hint = row.id ? 'Click to edit this trade' : 'Typed on this character’s card — click to edit it there';
-
-    return `<div class="post"${target}${canWrite() ? ` title="${hint}"` : ''}>
-      <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}${
-        row.id ? '' : '<span class="from-card" title="From this character’s own card">card</span>'}</span>
+    return `<div class="post" data-post="${esc(row.id)}"${canWrite() ? ' title="Click to edit this trade"' : ''}>
+      <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}</span>
       <span class="pwho">${who || '<em>nobody said who</em>'}${
         skill ? `<small>${esc(row.prof)} ${skill.level}</small>` : ''}</span>
       ${row.mats ? `<span class="pmats">You bring: ${esc(row.mats)}</span>` : '<span class="pmats"></span>'}
@@ -561,7 +552,32 @@
     set('races', D.RACES);
     set('classes', Object.keys(D.CLASSES));
     set('professions', Object.keys(D.PROFESSIONS));
+    fillProfSelects();
     specsFor($('classInput') ? $('classInput').value : '');
+  }
+
+  /**
+   * The two primary slots are picked from a list, so nobody can invent a
+   * profession by typo. A value already in the sheet that isn't on the list
+   * still gets an option of its own, or saving a character would quietly drop
+   * it.
+   */
+  function fillProfSelects() {
+    for (const which of ['prof1', 'prof2']) {
+      const sel = form[which];
+      const had = sel.value;
+      const names = PRIMARIES.includes(had) || !had ? PRIMARIES : PRIMARIES.concat(had);
+      sel.innerHTML = '<option value="">— none —</option>' +
+        names.map(n => `<option value="${esc(n)}">${D.PROFESSIONS[n] ? D.PROFESSIONS[n].icon + ' ' : ''}${esc(n)}</option>`).join('');
+      sel.value = had;
+    }
+  }
+
+  /** One skill box per secondary, built from `data.js` so the two stay in step. */
+  function fillSecondaries() {
+    $('secGrid').innerHTML = SECONDARIES.map(n => `<label>${D.PROFESSIONS[n].icon} ${esc(n)}
+      <input name="${esc(secKey(n))}" type="number" min="0" max="1000" inputmode="numeric" placeholder="—">
+    </label>`).join('');
   }
 
   /** Spec suggestions follow the class box, with every spec as a fallback. */
@@ -578,49 +594,25 @@
   const dlg = $('charDialog');
   const form = $('charForm');
 
-  function profHint(which) {
-    const name = form[`prof${which}`].value;
-    const level = form[`prof${which}Level`].value;
-    const hint = $(`prof${which}Hint`);
-    const key = normProf(name);
-    if (!String(name).trim()) { hint.textContent = ''; hint.className = 'hint'; return; }
-
-    if (!key) {
-      hint.className = 'hint warn';
-      hint.textContent = `“${name}” isn't a profession I know — it'll still be saved and shown.`;
-      return;
-    }
-    const meta = D.PROFESSIONS[key];
-    const bits = [`${meta.icon} ${key} · ${meta.kind}`];
-    const t = tierOf(level);
-    if (t) {
-      if (t.capped) bits.push(`maxed at ${t.goal}`);
-      else if (t.canTrain) bits.push(`${t.name} — can train ${t.canTrain.name} at level ${t.canTrain.level}`);
-      else if (t.next) bits.push(`${t.name} — train ${t.next.name} at ${t.next.trainAt}`);
-      else bits.push(`${t.name}, cap ${t.goal}`);
-    }
-    if (meta.needs) {
-      const holders = state.chars.filter(c => profsOf(c).some(p => p.name === meta.needs));
-      bits.push(holders.length
-        ? `needs ${meta.needs} — ${holders.map(c => c.name).join(', ')} ${holders.length > 1 ? 'have' : 'has'} it`
-        : `needs ${meta.needs} — nobody has it yet`);
-    }
-    hint.className = 'hint';
-    hint.textContent = bits.join(' · ');
-  }
+  const blankChar = () => Object.assign({
+    id: '', name: '', player: '', level: '', race: '', class: '', spec1: '', spec2: '',
+    prof1: '', prof1Level: '', prof2: '', prof2Level: '', notes: '',
+  }, Object.fromEntries(SECONDARIES.map(n => [secKey(n), ''])));
 
   function openChar(c) {
-    const blank = { id: '', name: '', player: '', level: '', race: '', class: '', spec1: '', spec2: '', prof1: '', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' };
+    const blank = blankChar();
     const data = Object.assign({}, blank, c || {});
-    // Newlines read better than semicolons while editing.
-    data.trades = tradesOf(data).join('\n');
+    // Fill the dropdowns before setting values, so an unknown profession from
+    // the sheet has an option to be selected.
+    data.prof1 = normProf(data.prof1) || data.prof1;
+    data.prof2 = normProf(data.prof2) || data.prof2;
     for (const k of Object.keys(blank)) if (form[k]) form[k].value = data[k] ?? '';
+    fillProfSelects();
+    for (const k of ['prof1', 'prof2']) form[k].value = data[k] ?? '';
 
     $('charTitle').textContent = c ? data.name : 'New character';
     $('deleteBtn').hidden = !c;
     specsFor(data.class);
-    profHint(1);
-    profHint(2);
     dlg.returnValue = '';
     dlg.showModal();
     form.name.focus();
@@ -632,7 +624,6 @@
     new FormData(form).forEach((v, k) => { c[k] = typeof v === 'string' ? v.trim() : v; });
     if (!c.name) return;
     c.id = c.id || newId();
-    c.trades = tradesOf(c).join('; ');
 
     const i = state.chars.findIndex(x => x.id === c.id);
     if (i >= 0) state.chars[i] = Object.assign({}, state.chars[i], c);
@@ -654,8 +645,6 @@
   });
 
   $('classInput').addEventListener('input', e => specsFor(e.target.value));
-  ['prof1', 'prof1Level'].forEach(n => form[n].addEventListener('input', () => profHint(1)));
-  ['prof2', 'prof2Level'].forEach(n => form[n].addEventListener('input', () => profHint(2)));
 
   document.querySelectorAll('dialog .cancel').forEach(b =>
     b.addEventListener('click', () => b.closest('dialog').close('cancel')));
@@ -825,6 +814,7 @@
 
   (async () => {
     $('realm').textContent = CFG.realm || '';
+    fillSecondaries();
     showMode();
     await refresh();
     if (!SCRIPT_URL) await local.save();   // keep the seeded roster around

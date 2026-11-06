@@ -11,6 +11,9 @@ a Google Sheet through a small Apps Script web app.
 
 - **Roster** — a card per character with class colour, level, specs and professions,
   grouped by player (or by class, or sorted by level). Search and filter by player.
+  A character has two primary profession slots, picked from a list so they can't be
+  mistyped, and a skill box for each secondary — Cooking, Fishing and First Aid — since
+  everyone has those. A secondary shows up once you put a number against it.
 - **Professions** — the part worth having. For every profession: who has it, their skill
   rank and progress towards that rank's cap, a star on the group's best crafter, and how
   many trades are posted for it. Professions nobody has are listed under their own
@@ -36,10 +39,6 @@ is a perfectly good post.
 If you name a character who's on the roster, the board shows their skill in that
 profession next to the trade, so people can see it's the maxed Tailor and not the
 level 3 alt. Name one who isn't on the roster and it posts anyway.
-
-The **What this character can make** lines on a character's own card show up on
-the board too, tagged `CARD`; clicking one opens that character rather than a
-post. Both are just text somebody typed — use whichever you prefer.
 
 Your name is remembered in your browser so you only type it once.
 
@@ -118,9 +117,10 @@ on the site, on either tab.
 
 ```
 id | name | player | level | race | class | spec1 | spec2 |
-prof1 | prof1Level | prof2 | prof2Level | profPlan | trades | notes | updated
+prof1 | prof1Level | prof2 | prof2Level | cooking | fishing | firstaid | notes | updated
 ```
 
 `id` keys the row, so renaming a character keeps their row. You can add rows by hand and
-leave `id` blank — the next write from the site fills one in. `trades` is a
-semicolon-separated list; the site shows it one per line while editing.
+leave `id` blank — the next write from the site fills one in. `prof1` and `prof2` are the
+two primary slots; `cooking`, `fishing` and `firstaid` are skill numbers, since everyone
+has those three.

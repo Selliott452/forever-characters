@@ -106,15 +106,15 @@ window.WOW_DATA = (() => {
   // Used only in localStorage mode (empty scriptUrl), so the site has something
   // to show before the Google Sheet is wired up. Mirrors seedRoster() in Code.gs.
   const SEED = [
-    { name: 'Daz Moonspear', player: 'Josh', level: 1, race: 'Night Elf', class: 'Druid', spec1: 'Feral (Bear)', spec2: 'Feral (Cat)', prof1: 'Skinning', prof1Level: 1, prof2: 'Leatherworking', prof2Level: 1, profPlan: 'Transition Skinning to Engineering end game', trades: '', notes: '' },
-    { name: 'Daz Lighthammer', player: 'Josh', level: 9, race: 'Dwarf', class: 'Paladin', spec1: 'Protection', spec2: 'Retribution', prof1: 'Mining', prof1Level: 1, prof2: 'Blacksmithing', prof2Level: 1, profPlan: '', trades: '', notes: '' },
-    { name: 'Daz Stoneblade', player: 'Josh', level: 1, race: 'Night Elf', class: 'Warrior', spec1: 'Protection', spec2: 'Fury', prof1: '', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' },
-    { name: 'Smoke Blazenbeard', player: 'Ian', level: 1, race: 'Dwarf', class: 'Paladin', spec1: 'Retribution', spec2: 'Protection', prof1: '', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' },
-    { name: 'Beard Smokenblaze', player: 'Ian', level: 1, race: 'Dwarf', class: 'Warrior', spec1: 'Fury', spec2: '', prof1: '', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' },
-    { name: 'Soot Kegsplitter', player: 'Adam', level: 9, race: 'Dwarf', class: 'Shaman', spec1: 'Elemental', spec2: 'Restoration', prof1: 'Herbalism', prof1Level: 15, prof2: 'Alchemy', prof2Level: 14, profPlan: '', trades: 'Peacebloom = Spell Damage potion; Silverleaf = Physical Damage potion', notes: '' },
-    { name: 'Summon Yous', player: 'Adam', level: 1, race: 'Human', class: 'Warlock', spec1: 'AH Bot', spec2: 'Summon Bot', prof1: '', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' },
-    { name: 'Oran Ge eard', player: 'Ryan', level: 9, race: 'Dwarf', class: 'Shaman', spec1: 'TBD', spec2: 'TBD', prof1: 'Mining', prof1Level: '', prof2: '', prof2Level: '', profPlan: '', trades: '', notes: '' },
-    { name: 'Anya BlazinBraids', player: 'Sam', level: 10, race: 'Dwarf', class: 'Priest', spec1: 'Shadow', spec2: 'TBD', prof1: 'Enchanting', prof1Level: 22, prof2: 'Tailoring', prof2Level: 44, profPlan: '', trades: '6 linen cloth = 6 slot bag', notes: '' },
+    { name: 'Daz Moonspear', player: 'Josh', level: 1, race: 'Night Elf', class: 'Druid', spec1: 'Feral (Bear)', spec2: 'Feral (Cat)', prof1: 'Skinning', prof1Level: 1, prof2: 'Leatherworking', prof2Level: 1, notes: 'Transition Skinning to Engineering end game' },
+    { name: 'Daz Lighthammer', player: 'Josh', level: 9, race: 'Dwarf', class: 'Paladin', spec1: 'Protection', spec2: 'Retribution', prof1: 'Mining', prof1Level: 1, prof2: 'Blacksmithing', prof2Level: 1, notes: '' },
+    { name: 'Daz Stoneblade', player: 'Josh', level: 1, race: 'Night Elf', class: 'Warrior', spec1: 'Protection', spec2: 'Fury', prof1: '', prof1Level: '', prof2: '', prof2Level: '', notes: '' },
+    { name: 'Smoke Blazenbeard', player: 'Ian', level: 1, race: 'Dwarf', class: 'Paladin', spec1: 'Retribution', spec2: 'Protection', prof1: '', prof1Level: '', prof2: '', prof2Level: '', notes: '' },
+    { name: 'Beard Smokenblaze', player: 'Ian', level: 1, race: 'Dwarf', class: 'Warrior', spec1: 'Fury', spec2: '', prof1: '', prof1Level: '', prof2: '', prof2Level: '', notes: '' },
+    { name: 'Soot Kegsplitter', player: 'Adam', level: 9, race: 'Dwarf', class: 'Shaman', spec1: 'Elemental', spec2: 'Restoration', prof1: 'Herbalism', prof1Level: 15, prof2: 'Alchemy', prof2Level: 14, notes: '' },
+    { name: 'Summon Yous', player: 'Adam', level: 1, race: 'Human', class: 'Warlock', spec1: 'AH Bot', spec2: 'Summon Bot', prof1: '', prof1Level: '', prof2: '', prof2Level: '', notes: '' },
+    { name: 'Oran Ge eard', player: 'Ryan', level: 9, race: 'Dwarf', class: 'Shaman', spec1: 'TBD', spec2: 'TBD', prof1: 'Mining', prof1Level: '', prof2: '', prof2Level: '', notes: '' },
+    { name: 'Anya BlazinBraids', player: 'Sam', level: 10, race: 'Dwarf', class: 'Priest', spec1: 'Shadow', spec2: 'TBD', prof1: 'Enchanting', prof1Level: 22, prof2: 'Tailoring', prof2Level: 44, cooking: 12, firstaid: 30, notes: '' },
   ];
 
   // One example trade so the board isn't empty before anyone posts. Every

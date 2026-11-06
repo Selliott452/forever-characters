@@ -70,32 +70,24 @@
       <legend>Professions</legend>
       <div class="grid profgrid">
         <label class="span2">Profession #1
-          <input name="prof1" list="professions" autocomplete="off">
+          <select name="prof1" id="prof1"></select>
         </label>
         <label>Skill
           <input name="prof1Level" type="number" min="0" max="1000" inputmode="numeric" placeholder="—">
         </label>
-        <p class="hint" id="prof1Hint"></p>
 
         <label class="span2">Profession #2
-          <input name="prof2" list="professions" autocomplete="off">
+          <select name="prof2" id="prof2"></select>
         </label>
         <label>Skill
           <input name="prof2Level" type="number" min="0" max="1000" inputmode="numeric" placeholder="—">
         </label>
-        <p class="hint" id="prof2Hint"></p>
       </div>
+    </fieldset>
 
-      <label>Plan
-        <input name="profPlan" autocomplete="off" placeholder="e.g. drop Skinning for Engineering at 60">
-      </label>
-
-      <label>What this character can make
-        <textarea name="trades" rows="3" placeholder="One per line, e.g.
-6 linen cloth = 6 slot bag
-Peacebloom = Spell Damage potion"></textarea>
-        <span class="hint">One per line. These show up on the trade board for everyone.</span>
-      </label>
+    <fieldset>
+      <legend>Secondary professions</legend>
+      <div class="grid secgrid" id="secGrid"></div>
     </fieldset>
 
     <label>Notes

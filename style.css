@@ -408,20 +408,6 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
   margin-top: 2px;
 }
 
-/* A line typed on a character's own card rather than posted here. */
-.from-card {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  color: var(--dim);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0 5px;
-  margin-left: 6px;
-  vertical-align: 1px;
-  font-weight: 400;
-}
-
 .postgrid { grid-template-columns: 1fr 1fr; }
 
 @media (max-width: 760px) {
