@@ -143,8 +143,7 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
   align-items: center;
   margin-bottom: 16px;
 }
-/* On a page that opens with the toolbar rather than the summary cards, it
-   needs the same room under the tab bar that .stats gets. */
+/* Every page opens on its toolbar or a heading, so give it room under the tabs. */
 #view > .toolbar:first-child { margin-top: 14px; }
 .toolbar input[type="search"] { width: 220px; }
 .toolbar select, .toolbar input { width: auto; }
@@ -163,22 +162,6 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
 .chip.on { color: #0e1116; background: var(--gold); border-color: var(--gold); font-weight: 600; }
 
 /* ---------- stat strip ---------- */
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
-  /* The tab bar sits right above these, so they need room to breathe. */
-  margin: 14px 0 18px;
-}
-.stat {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 13px;
-}
-.stat b { display: block; font-size: 22px; line-height: 1.2; color: var(--gold); }
-.stat span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
 
 /* ---------- roster ---------- */
 

@@ -284,19 +284,6 @@
       .filter(c => matches(c, q))
       .filter(c => !player || (c.player || 'unassigned') === player);
 
-    const covered = new Set();
-    state.chars.forEach(c => profsOf(c).forEach(p => { if (p.known) covered.add(p.name); }));
-    const primaries = Object.keys(D.PROFESSIONS).filter(p => D.PROFESSIONS[p].kind !== 'secondary');
-    const coveredPrimary = primaries.filter(p => covered.has(p)).length;
-    const levels = state.chars.map(c => Number(c.level) || 0);
-
-    const stats = `<div class="stats">
-      <div class="stat"><b>${state.chars.length}</b><span>Characters</span></div>
-      <div class="stat"><b>${players.length}</b><span>Players</span></div>
-      <div class="stat"><b>${levels.length ? Math.max(...levels) : 0}</b><span>Highest level</span></div>
-      <div class="stat"><b>${coveredPrimary}/${primaries.length}</b><span>Professions covered</span></div>
-    </div>`;
-
     const toolbar = `<div class="toolbar">
       <input type="search" id="q" placeholder="Search characters…" value="${esc(q)}">
       <select id="group">
@@ -312,7 +299,7 @@
     </div>`;
 
     if (!list.length) {
-      return stats + toolbar + `<p class="empty">${state.chars.length ? 'Nothing matches that.' : 'No characters yet.'}</p>`;
+      return toolbar + `<p class="empty">${state.chars.length ? 'Nothing matches that.' : 'No characters yet.'}</p>`;
     }
 
     let body = '';
@@ -341,7 +328,7 @@
             <div class="cards">${sorted.map(c => charCard(c, { showPlayer: group === 'class' })).join('')}</div>`;
         }).join('');
     }
-    return stats + toolbar + body;
+    return toolbar + body;
   }
 
   /* ---------- view: professions ---------- */
