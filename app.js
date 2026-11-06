@@ -386,23 +386,25 @@
 
   function renderProfessions() {
     const idx = professionIndex();
-    const order = ['gathering', 'crafting', 'secondary'];
     const known = Object.keys(D.PROFESSIONS);
     const extra = [...idx.keys()].filter(n => !D.PROFESSIONS[n]);
 
-    const taken = known.filter(n => (idx.get(n) || { holders: [] }).holders.length);
-    const open = known.filter(n => !(idx.get(n) || { holders: [] }).holders.length);
-    const byKind = (a, b) => order.indexOf(D.PROFESSIONS[a].kind) - order.indexOf(D.PROFESSIONS[b].kind) ||
-      a.localeCompare(b);
+    // Grouped by what kind of profession it is. Within a group, the ones
+    // somebody has come first — the rest keep their dashed card, which is
+    // enough to say nobody has them.
+    const has = n => (idx.get(n) || { holders: [] }).holders.length;
+    const byUse = (a, b) => (has(b) ? 1 : 0) - (has(a) ? 1 : 0) || a.localeCompare(b);
+    const ofKind = kind => known.filter(n => D.PROFESSIONS[n].kind === kind).sort(byUse);
 
     const section = (title, names) => names.length
       ? `<h2 class="section-title">${esc(title)}</h2>
          <div class="profcards">${names.map(n => profCard(n, idx.get(n))).join('')}</div>`
       : '';
 
-    return section('Covered', taken.sort(byKind)) +
-      section('Spelled differently in the sheet', extra.sort()) +
-      section('Nobody has these yet', open.sort(byKind));
+    return section('Gathering', ofKind('gathering')) +
+      section('Crafting', ofKind('crafting')) +
+      section('Secondary', ofKind('secondary')) +
+      section('Spelled differently in the sheet', extra.sort());
   }
 
   /* ---------- view: trade board ---------- */

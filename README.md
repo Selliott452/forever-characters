@@ -16,8 +16,8 @@ a Google Sheet through a small Apps Script web app.
   everyone has those. A secondary shows up once you put a number against it.
 - **Professions** — the part worth having. For every profession: who has it, their skill
   rank and progress towards that rank's cap, a star on the group's best crafter, and how
-  many trades are posted for it. Professions nobody has are listed under their own
-  heading.
+  many trades are posted for it, grouped into gathering, crafting and secondary. The
+  ones nobody has yet sit at the end of their group with a dashed border.
 - **Trade board** — a board of trades people have posted: *I can craft this, bring
   me that*. Nothing on it is generated or fetched — every line is there because
   somebody typed it. Each trade carries the character who makes it, the
