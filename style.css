@@ -143,6 +143,9 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
   align-items: center;
   margin-bottom: 16px;
 }
+/* On a page that opens with the toolbar rather than the summary cards, it
+   needs the same room under the tab bar that .stats gets. */
+#view > .toolbar:first-child { margin-top: 14px; }
 .toolbar input[type="search"] { width: 220px; }
 .toolbar select, .toolbar input { width: auto; }
 .toolbar .spacer { flex: 1; }

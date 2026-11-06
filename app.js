@@ -480,13 +480,6 @@
       .filter(r => !q || [r.item, r.mats, r.note, r.char, r.by, r.prof]
         .join(' ').toLowerCase().includes(q));
 
-    const stats = `<div class="stats">
-      <div class="stat"><b>${all.length}</b><span>Trades posted</span></div>
-      <div class="stat"><b>${new Set(all.map(r => r.char.toLowerCase()).filter(Boolean)).size}</b><span>Characters offering</span></div>
-      <div class="stat"><b>${profs.length}</b><span>Professions</span></div>
-      <div class="stat"><b>${new Set(all.map(r => r.by.toLowerCase()).filter(Boolean)).size}</b><span>Players</span></div>
-    </div>`;
-
     const toolbar = `<div class="toolbar">
       <input type="search" id="tq" placeholder="Search trades…" value="${esc(ui.tq)}">
       <select id="tgroup">
@@ -509,12 +502,12 @@
         : canWrite()
           ? 'No trades yet. Click <b>+ Post a trade</b> to put the first one up.'
           : 'No trades yet.';
-      return stats + toolbar + `<p class="empty">${nothing}</p>`;
+      return toolbar + `<p class="empty">${nothing}</p>`;
     }
 
     if (ui.tgroup === 'new') {
       const sorted = [...list].sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
-      return stats + toolbar + `<div class="posts">${sorted.map(tradeRow).join('')}</div>`;
+      return toolbar + `<div class="posts">${sorted.map(tradeRow).join('')}</div>`;
     }
 
     const blank = NOT_SAID[ui.tgroup];
@@ -544,7 +537,7 @@
           <div class="posts">${rs.map(r => tradeRow(r, ui.tgroup === 'char')).join('')}</div>`;
       }).join('');
 
-    return stats + toolbar + body;
+    return toolbar + body;
   }
 
   /* ---------- render & routing ---------- */
