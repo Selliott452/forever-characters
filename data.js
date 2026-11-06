@@ -1,24 +1,36 @@
 /**
- * Static game data: classes, specs, races, professions and the skill ladder.
- * Nothing here is fetched — it's all baked in so the site works offline.
+ * Static game data for **WoW: Forever**: classes, specs, races, professions and
+ * the skill ladder. Nothing here is fetched — it's all baked in so the site
+ * works offline.
  *
- * None of it is enforced. The forms use `<input list="...">`, so these lists
- * are suggestions only and you can always type something they don't contain
- * ("AH Bot", "TBD", a race/class combo your version of WoW allows).
+ * Mostly unenforced. Race, class and spec are `<input list="...">`, so these
+ * lists are suggestions and you can always type something they don't contain
+ * ("AH Bot", "TBD", a combo a patch adds later). The two profession slots are
+ * the exception: they're real dropdowns, so PROFESSIONS below is the whole
+ * set of things a character can have.
+ *
+ * Forever launched 2026-11-04 and differs from Classic in ways worth knowing
+ * before editing any of this. Checked against warcrafttavern.com/forever and
+ * warcraftforever.games on 2026-11-06; re-check against the live client rather
+ * than from memory, since much of the writing about this game is still beta-era.
  */
 window.WOW_DATA = (() => {
-  // Official class colours, used for character names and class badges.
+  /**
+   * Forever's nine classes, with their specs. There is no Death Knight, Monk,
+   * Demon Hunter or Evoker — the game launched with the nine original classes
+   * and added none. Colours are the long-standing official ones.
+   *
+   * Druid is Balance / Feral Combat / Restoration, one Feral tree rather than
+   * the split cat-and-bear specs later versions use, and Rogue has Combat
+   * rather than Outlaw. Sources are at the bottom of this file.
+   */
   const CLASSES = {
-    'Death Knight': { color: '#C41E3A', specs: ['Blood', 'Frost', 'Unholy'] },
-    'Demon Hunter': { color: '#A330C9', specs: ['Havoc', 'Vengeance'] },
-    Druid: { color: '#FF7C0A', specs: ['Balance', 'Feral (Cat)', 'Feral (Bear)', 'Guardian', 'Restoration'] },
-    Evoker: { color: '#33937F', specs: ['Devastation', 'Preservation', 'Augmentation'] },
+    Druid: { color: '#FF7C0A', specs: ['Balance', 'Feral Combat', 'Restoration'] },
     Hunter: { color: '#AAD372', specs: ['Beast Mastery', 'Marksmanship', 'Survival'] },
     Mage: { color: '#3FC7EB', specs: ['Arcane', 'Fire', 'Frost'] },
-    Monk: { color: '#00FF98', specs: ['Brewmaster', 'Mistweaver', 'Windwalker'] },
     Paladin: { color: '#F48CBA', specs: ['Holy', 'Protection', 'Retribution'] },
     Priest: { color: '#FFFFFF', specs: ['Discipline', 'Holy', 'Shadow'] },
-    Rogue: { color: '#FFF468', specs: ['Assassination', 'Combat', 'Outlaw', 'Subtlety'] },
+    Rogue: { color: '#FFF468', specs: ['Assassination', 'Combat', 'Subtlety'] },
     Shaman: { color: '#0070DD', specs: ['Elemental', 'Enhancement', 'Restoration'] },
     Warlock: { color: '#8788EE', specs: ['Affliction', 'Demonology', 'Destruction'] },
     Warrior: { color: '#C69B6D', specs: ['Arms', 'Fury', 'Protection'] },
@@ -27,16 +39,24 @@ window.WOW_DATA = (() => {
   // Spelling we have already seen in the sheet, plus the obvious shorthand.
   const CLASS_ALIASES = {
     shamen: 'Shaman', sham: 'Shaman', shammy: 'Shaman',
-    dk: 'Death Knight', dh: 'Demon Hunter',
     pally: 'Paladin', pala: 'Paladin', lock: 'Warlock', warr: 'Warrior',
+    hunt: 'Hunter', rog: 'Rogue', wl: 'Warlock',
   };
 
+  /**
+   * Four races a side, plus Skyborne, who pick their faction at creation and
+   * are named for the side they choose. None of the later-expansion races are
+   * in Forever — no Blood Elf, Draenei, Worgen, Goblin, Pandaren or anything
+   * after them. Both Skyborne names are listed along with the bare "Skyborne",
+   * since that is what people actually type.
+   */
   const RACES = [
-    'Human', 'Dwarf', 'Night Elf', 'Gnome', 'Draenei', 'Worgen',
-    'Orc', 'Troll', 'Tauren', 'Undead', 'Blood Elf', 'Goblin',
-    'Pandaren', 'Void Elf', 'Lightforged Draenei', 'Dark Iron Dwarf', 'Kul Tiran', 'Mechagnome',
-    'Nightborne', 'Highmountain Tauren', 'Mag’har Orc', 'Zandalari Troll', 'Vulpera',
-    'Dracthyr', 'Earthen',
+    // Alliance
+    'Human', 'Dwarf', 'Night Elf', 'Gnome',
+    // Horde
+    'Orc', 'Undead', 'Tauren', 'Troll',
+    // Either, chosen at character creation
+    'Skyborne', 'High Order Skyborne', 'Windshaper Skyborne',
   ];
 
   /**

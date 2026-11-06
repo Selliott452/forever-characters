@@ -99,9 +99,12 @@ This one is live at **https://selliott452.github.io/forever-characters/**, serve
 | `professionMax` | profession skill cap (default 300); also decides which skill ranks exist |
 | `realm` | optional label shown next to the title |
 
-Classes, races, specs, professions and the skill ranks live in `data.js`. The lists are
-only suggestions — every field accepts free text, so odd combinations and jokes like
-"AH Bot" work fine.
+Classes, races, specs, professions and the skill ranks live in `data.js`, set to what
+Forever actually has: the nine original classes with no Death Knight, Monk, Demon Hunter
+or Evoker; four races a side plus the Skyborne, who pick a faction at creation; and no
+Jewelcrafting or Inscription. Race, class and spec are only suggestions — those fields
+accept free text, so odd combinations and jokes like "AH Bot" work fine. The two
+profession slots are dropdowns, so those are the whole list.
 
 ## The sheet
 
