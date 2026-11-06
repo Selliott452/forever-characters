@@ -39,11 +39,6 @@ window.WOW_DATA = (() => {
     'Dracthyr', 'Earthen',
   ];
 
-  const ALLIANCE = new Set([
-    'Human', 'Dwarf', 'Night Elf', 'Gnome', 'Draenei', 'Worgen',
-    'Void Elf', 'Lightforged Draenei', 'Dark Iron Dwarf', 'Kul Tiran', 'Mechagnome',
-  ]);
-
   /**
    * WoW: Forever has 9 primary professions and 3 secondary ones. Note there is
    * no Jewelcrafting or Inscription, Enchanting both gathers and crafts, and
@@ -51,27 +46,31 @@ window.WOW_DATA = (() => {
    * you make). Camping isn't a profession — every profession gets camp objects
    * at skill 20, 140 and 300 instead.
    *
-   * kind:    'gathering' | 'crafting' | 'secondary'
-   * gathers: true if it also collects its own materials
-   * feeds:   the professions this one supplies
-   * needs:   the profession that supplies this one
-   * makes:   a short "what is it for" line, shown on the Professions page
+   * kind:  'gathering' | 'crafting' | 'secondary'  — the Professions page groups on this
+   * icon:  shown next to the name everywhere
+   * makes: a short "what is it for" line, shown on the Professions page
+   *
+   * Who supplies whom, for reference — the site used to print this on every
+   * card and no longer does, so it lives here rather than as fields nothing
+   * reads: Mining feeds Blacksmithing and Engineering, Herbalism feeds
+   * Alchemy, Skinning feeds Leatherworking, Enchanting feeds Tailoring,
+   * Fishing feeds Cooking. Enchanting and Fishing collect their own materials.
    */
   const PROFESSIONS = {
-    Mining: { kind: 'gathering', icon: '⛏️', feeds: ['Blacksmithing', 'Engineering'], makes: 'Ore, bars, stone and gems' },
-    Herbalism: { kind: 'gathering', icon: '🌿', feeds: ['Alchemy'], makes: 'Herbs for potions and elixirs' },
-    Skinning: { kind: 'gathering', icon: '🔪', feeds: ['Leatherworking'], makes: 'Leather and hides' },
+    Mining: { kind: 'gathering', icon: '⛏️', makes: 'Ore, bars, stone and gems' },
+    Herbalism: { kind: 'gathering', icon: '🌿', makes: 'Herbs for potions and elixirs' },
+    Skinning: { kind: 'gathering', icon: '🔪', makes: 'Leather and hides' },
 
-    Alchemy: { kind: 'crafting', icon: '⚗️', needs: 'Herbalism', makes: 'Potions, elixirs, flasks' },
-    Blacksmithing: { kind: 'crafting', icon: '🔨', needs: 'Mining', makes: 'Plate and mail armour, weapons, sharpening stones' },
-    Enchanting: { kind: 'crafting', icon: '✨', needs: null, gathers: true, feeds: ['Tailoring'], makes: 'Enchants, wands and relics — and the dust to make them' },
-    Engineering: { kind: 'crafting', icon: '⚙️', needs: 'Mining', makes: 'Bombs, goggles, gadgets, toys' },
-    Leatherworking: { kind: 'crafting', icon: '🧵', needs: 'Skinning', makes: 'Leather and mail armour, armour kits' },
-    Tailoring: { kind: 'crafting', icon: '🧶', needs: 'Enchanting', makes: 'Cloth armour and bags — cloth comes from drops' },
+    Alchemy: { kind: 'crafting', icon: '⚗️', makes: 'Potions, elixirs, flasks' },
+    Blacksmithing: { kind: 'crafting', icon: '🔨', makes: 'Plate and mail armour, weapons, sharpening stones' },
+    Enchanting: { kind: 'crafting', icon: '✨', makes: 'Enchants, wands and relics — and the dust to make them' },
+    Engineering: { kind: 'crafting', icon: '⚙️', makes: 'Bombs, goggles, gadgets, toys' },
+    Leatherworking: { kind: 'crafting', icon: '🧵', makes: 'Leather and mail armour, armour kits' },
+    Tailoring: { kind: 'crafting', icon: '🧶', makes: 'Cloth armour and bags — cloth comes from drops' },
 
-    Cooking: { kind: 'secondary', icon: '🍖', needs: 'Fishing', makes: 'Food buffs' },
-    'First Aid': { kind: 'secondary', icon: '🩹', needs: null, makes: 'Bandages, healing potions, debuff cures' },
-    Fishing: { kind: 'secondary', icon: '🎣', gathers: true, feeds: ['Cooking'], makes: 'Fish, for cooking and for Fire Oil' },
+    Cooking: { kind: 'secondary', icon: '🍖', makes: 'Food buffs' },
+    'First Aid': { kind: 'secondary', icon: '🩹', makes: 'Bandages, healing potions, debuff cures' },
+    Fishing: { kind: 'secondary', icon: '🎣', makes: 'Fish, for cooking and for Fire Oil' },
   };
 
   // Spellings from the sheet and the usual abbreviations.
@@ -83,7 +82,6 @@ window.WOW_DATA = (() => {
     bs: 'Blacksmithing', smithing: 'Blacksmithing', blacksmith: 'Blacksmithing',
     ench: 'Enchanting', enchant: 'Enchanting',
     eng: 'Engineering', engi: 'Engineering', engineer: 'Engineering',
-    jc: 'Jewelcrafting',
     lw: 'Leatherworking', leather: 'Leatherworking',
     tailor: 'Tailoring', tailering: 'Tailoring',
     cook: 'Cooking', 'first-aid': 'First Aid', firstaid: 'First Aid', fish: 'Fishing',
@@ -91,16 +89,18 @@ window.WOW_DATA = (() => {
 
   /**
    * Forever's four training ranks. `cap` is the highest skill that rank allows,
-   * `trainAt` is the skill you need before a trainer will teach you the next
-   * one, and `level` is the character level that rank needs. So you can be
-   * sitting at 60 Tailoring, eligible to train Journeyman, but stuck at the
-   * Apprentice cap of 75 until you hit character level 10.
+   * which is what the skill bars fill towards.
+   *
+   * For reference, since the site doesn't show it: a trainer will teach you the
+   * next rank at 50 / 125 / 200 skill, and those ranks need character level
+   * 10 / 20 / 35. So you can be sitting at 60 Tailoring, eligible to train
+   * Journeyman, but stuck at the Apprentice cap of 75 until you hit level 10.
    */
   const TIERS = [
-    { name: 'Apprentice', cap: 75, trainAt: 0, level: 1 },
-    { name: 'Journeyman', cap: 150, trainAt: 50, level: 10 },
-    { name: 'Expert', cap: 225, trainAt: 125, level: 20 },
-    { name: 'Artisan', cap: 300, trainAt: 200, level: 35 },
+    { name: 'Apprentice', cap: 75 },
+    { name: 'Journeyman', cap: 150 },
+    { name: 'Expert', cap: 225 },
+    { name: 'Artisan', cap: 300 },
   ];
 
   // Used only in localStorage mode (empty scriptUrl), so the site has something
@@ -123,5 +123,5 @@ window.WOW_DATA = (() => {
     { char: 'Anya BlazinBraids', profession: 'Enchanting', item: 'Minor Wizard Oil', mats: 'bring the oil, I have the dust', note: 'free for the group', by: 'Sam' },
   ];
 
-  return { CLASSES, CLASS_ALIASES, RACES, ALLIANCE, PROFESSIONS, PROFESSION_ALIASES, TIERS, SEED, SEED_POSTS };
+  return { CLASSES, CLASS_ALIASES, RACES, PROFESSIONS, PROFESSION_ALIASES, TIERS, SEED, SEED_POSTS };
 })();

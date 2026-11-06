@@ -1,5 +1,5 @@
 // Tiny static file server for previewing the site locally.
-// Run with `npm start`, then open http://localhost:8000
+// Run with `npm start`, then open http://localhost:8001
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';

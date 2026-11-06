@@ -113,7 +113,6 @@ button.primary { background: #3a5a8c; border-color: #4a6da6; }
 button.primary:hover { background: #456aa3; }
 button.danger { background: #6d2a37; border-color: #8c3747; }
 button.danger:hover { background: #80323f; }
-button.ghost { background: transparent; }
 button:disabled { opacity: .5; cursor: default; }
 
 input, select, textarea {
@@ -373,8 +372,8 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
   padding: 9px 13px;
   font-size: 13.5px;
 }
-.post[data-post], .post[data-id] { cursor: pointer; }
-.post[data-post]:hover, .post[data-id]:hover { border-color: #3d4a5c; }
+.post[data-post] { cursor: pointer; }
+.post[data-post]:hover { border-color: #3d4a5c; }
 
 .post .pitem { font-weight: 600; font-size: 14px; }
 .post .pwho { color: var(--muted); font-size: 12.5px; }
@@ -430,7 +429,6 @@ dialog legend { font-size: 12px; color: var(--gold); text-transform: uppercase; 
 .profgrid { grid-template-columns: 1fr 1fr 90px; }
 .hint { grid-column: 1 / -1; margin: -6px 0 10px; font-size: 12px; color: var(--dim); min-height: 16px; }
 .hint.warn { color: var(--warn); }
-span.hint { display: block; margin: 3px 0 0; }
 
 dialog menu {
   display: flex;

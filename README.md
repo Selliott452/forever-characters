@@ -70,7 +70,7 @@ around without touching the sheet.
 2. **Extensions → Apps Script**, delete the sample code and paste in `apps-script/Code.gs`.
 3. Run `setup()` once. Approve the permissions prompt, then open **View → Logs** and copy
    the write token it printed.
-4. Optionally run `seedRoster()` to fill empty tabs with the starting roster and
+4. Optionally run `seedSheet()` to fill empty tabs with the starting roster and
    one example trade.
 5. **Deploy → New deployment → Web app**, with *Execute as: Me* and
    *Who has access: Anyone*. Copy the `/exec` URL.

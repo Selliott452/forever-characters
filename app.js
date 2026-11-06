@@ -19,6 +19,21 @@
   const newId = () => Math.random().toString(36).slice(2, 10);
   const titleCase = s => String(s).replace(/\S+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
 
+  /** list -> Map(key -> items), keys in the order they first turn up. */
+  function groupBy(list, keyOf) {
+    const groups = new Map();
+    for (const item of list) {
+      const k = keyOf(item);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(item);
+    }
+    return groups;
+  }
+
+  /** How characters are ordered everywhere: furthest along first. */
+  const byLevelThenName = (a, b) => (Number(b.level) || 0) - (Number(a.level) || 0) ||
+    String(a.name).localeCompare(String(b.name));
+
   const state = {
     chars: [],
     posts: [],     // the trade board: one row per thing somebody offers to make
@@ -75,9 +90,6 @@
       goal: cur.cap,
       pct: Math.max(2, Math.min(100, Math.round(((n - floor) / Math.max(1, cur.cap - floor)) * 100))),
       capped: !next && n >= Math.min(cur.cap, PROF_MAX),
-      next,
-      // Trainers teach the next rank before you hit the current cap.
-      canTrain: next && n >= next.trainAt ? next : null,
     };
   }
 
@@ -87,12 +99,10 @@
       const name = normProf(raw);
       const meta = D.PROFESSIONS[name] || {};
       return {
-        raw: String(raw).trim(),
         name: name || String(raw).trim(),
         known: !!name,
         kind: meta.kind || 'unknown',
         icon: meta.icon || '❓',
-        needs: meta.needs || null,
         level: lvl === '' || lvl == null ? '' : Number(lvl),
         tier: tierOf(lvl),
       };
@@ -128,31 +138,21 @@
   const charNamed = name => state.chars.find(c =>
     String(c.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
 
-  /** The poster's skill in the profession they posted under, if we can tell. */
-  function skillFor(row) {
-    const c = charNamed(row.char);
-    if (!c || !row.prof) return null;
-    const p = profsOf(c).find(x => x.name === row.prof);
-    return p && p.level !== '' ? p : null;
-  }
-
-  /** Everything the board shows. One row per post, and that's the lot. */
-  function boardRows() {
-    const rows = [];
-    for (const post of state.posts) {
-      rows.push({
-        id: post.id || '',
-        char: String(post.char || '').trim(),
-        prof: normProf(post.profession) || String(post.profession || '').trim(),
-        item: String(post.item || '').trim(),
-        mats: String(post.mats || '').trim(),
-        note: String(post.note || '').trim(),
-        by: String(post.by || '').trim(),
-        updated: post.updated || '',
-      });
-    }
-    return rows;
-  }
+  /** Everything the board shows: one row per post, trimmed and with the
+   *  profession spelled the way `data.js` spells it. */
+  const boardRows = () => state.posts.map(post => {
+    const text = k => String(post[k] || '').trim();
+    return {
+      id: post.id || '',
+      char: text('char'),
+      prof: normProf(post.profession) || text('profession'),
+      item: text('item'),
+      mats: text('mats'),
+      note: text('note'),
+      by: text('by'),
+      updated: post.updated || '',
+    };
+  });
 
   /* ---------- storage: Google Sheet via Apps Script, or this browser ---------- */
 
@@ -230,21 +230,20 @@
   /* ---------- small render helpers ---------- */
 
   const bar = (pct, cls) => `<div class="${cls || 'bar'}"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>`;
+  const tierBadge = tier => tier ? `<span class="tier">${esc(tier.capped ? 'Max' : tier.name)}</span>` : '';
+  const skillText = p => p.level === '' ? '&mdash;' : `${p.level}${p.tier ? ' / ' + p.tier.goal : ''}`;
 
   function profRow(p) {
-    const skill = p.level === '' ? '&mdash;'
-      : p.tier ? `${p.level} / ${p.tier.goal}` : String(p.level);
-    const tier = p.tier ? `<span class="tier">${esc(p.tier.capped ? 'Max' : p.tier.name)}</span>` : '';
     const unknown = p.known ? '' : ' <small>(not a known profession)</small>';
     return `<div class="prof ${p.kind}">
       <span class="icon">${p.icon}</span>
-      <span class="pname">${esc(p.name)}${unknown}${tier}</span>
-      <span class="pskill">${skill}</span>
+      <span class="pname">${esc(p.name)}${unknown}${tierBadge(p.tier)}</span>
+      <span class="pskill">${skillText(p)}</span>
       ${p.tier ? bar(p.tier.pct, 'pbar') : '<div class="pbar"></div>'}
     </div>`;
   }
 
-  function charCard(c, opts) {
+  function charCard(c, showPlayer) {
     const color = classColor(c.class);
     const lvlPct = Math.round((Math.min(Number(c.level) || 0, LEVEL_MAX) / LEVEL_MAX) * 100);
     const profs = profsOf(c);
@@ -256,7 +255,7 @@
       ${bar(lvlPct)}
       <div class="sub">
         ${esc(c.race || '?')}<span class="sep">&middot;</span>${esc(c.class || '?')}
-        ${opts && opts.showPlayer ? `<span class="sep">&middot;</span>${esc(c.player || 'unassigned')}` : ''}
+        ${showPlayer ? `<span class="sep">&middot;</span>${esc(c.player || 'unassigned')}` : ''}
       </div>
       ${specs.length ? `<div class="specs">${specs.map((s, i) =>
         `<span class="spec ${/^tbd$/i.test(s) ? 'tbd' : (i === 0 ? 'main' : '')}">${esc(s)}</span>`).join('')}</div>` : ''}
@@ -302,32 +301,23 @@
       return toolbar + `<p class="empty">${state.chars.length ? 'Nothing matches that.' : 'No characters yet.'}</p>`;
     }
 
-    let body = '';
     if (group === 'level') {
-      const sorted = [...list].sort((a, b) => (Number(b.level) || 0) - (Number(a.level) || 0) ||
-        String(a.name).localeCompare(String(b.name)));
-      body = `<div class="cards">${sorted.map(c => charCard(c, { showPlayer: true })).join('')}</div>`;
-    } else {
-      const keyOf = c => group === 'class' ? (c.class || 'Unknown class') : (c.player || 'unassigned');
-      const groups = new Map();
-      list.forEach(c => {
-        const k = keyOf(c);
-        if (!groups.has(k)) groups.set(k, []);
-        groups.get(k).push(c);
-      });
-      body = [...groups.entries()]
-        .sort((a, b) => b[1].length - a[1].length || String(a[0]).localeCompare(String(b[0])))
-        .map(([k, cs]) => {
-          const color = group === 'class' ? classColor(k) : '';
-          const sorted = [...cs].sort((a, b) => (Number(b.level) || 0) - (Number(a.level) || 0) ||
-            String(a.name).localeCompare(String(b.name)));
-          return `<div class="playerhead">
-              <h2${color ? ` style="color:${esc(color)}"` : ''}>${esc(k)}</h2>
-              <span class="count">${cs.length} character${cs.length === 1 ? '' : 's'}</span>
-            </div>
-            <div class="cards">${sorted.map(c => charCard(c, { showPlayer: group === 'class' })).join('')}</div>`;
-        }).join('');
+      const sorted = [...list].sort(byLevelThenName);
+      return toolbar + `<div class="cards">${sorted.map(c => charCard(c, true)).join('')}</div>`;
     }
+
+    const byClass = group === 'class';
+    const groups = groupBy(list, c => byClass ? (c.class || 'Unknown class') : (c.player || 'unassigned'));
+    const body = [...groups.entries()]
+      .sort((a, b) => b[1].length - a[1].length || String(a[0]).localeCompare(String(b[0])))
+      .map(([k, cs]) => {
+        const color = byClass ? classColor(k) : '';
+        return `<div class="playerhead">
+            <h2${color ? ` style="color:${esc(color)}"` : ''}>${esc(k)}</h2>
+            <span class="count">${cs.length} character${cs.length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="cards">${[...cs].sort(byLevelThenName).map(c => charCard(c, byClass)).join('')}</div>`;
+      }).join('');
     return toolbar + body;
   }
 
@@ -352,24 +342,19 @@
   function holderLi(h, best) {
     const { c, p } = h;
     const color = classColor(c.class);
-    const skill = p.level === '' ? '&mdash;' : `${p.level}${p.tier ? ' / ' + p.tier.goal : ''}`;
-    const tier = p.tier ? ` <span class="tier">${esc(p.tier.capped ? 'Max' : p.tier.name)}</span>` : '';
     return `<li class="${best ? 'best' : ''}" data-id="${esc(c.id)}" style="--cc:${esc(color || '#e6e9ef')}">
       <span class="who">${esc(c.name)}<small>${esc(c.player || '')}${c.level ? ' &middot; Lv ' + esc(c.level) : ''}</small></span>
-      <span class="skill">${skill}${tier}</span>
+      <span class="skill">${skillText(p)} ${tierBadge(p.tier)}</span>
       ${p.tier ? bar(p.tier.pct, 'hbar') : ''}
     </li>`;
   }
 
-  function profCard(name, entry) {
+  function profCard(name, entry, posted) {
     const meta = D.PROFESSIONS[name] || { kind: 'unknown', icon: '❓', makes: '' };
     const holders = entry ? entry.holders : [];
     const bestLevel = Math.max(...holders.map(h => Number(h.p.level) || 0), 0);
-
-    const posted = state.posts.filter(x =>
-      (normProf(x.profession) || String(x.profession || '').trim()) === name);
-    const postLine = posted.length
-      ? `<p class="unlocked"><b>${posted.length}</b> thing${posted.length === 1 ? '' : 's'} on the trade board
+    const postLine = posted
+      ? `<p class="unlocked"><b>${posted}</b> thing${posted === 1 ? '' : 's'} on the trade board
            &middot; <a href="#/trades" data-prof="${esc(name)}">see them</a></p>`
       : '';
 
@@ -388,6 +373,7 @@
     const idx = professionIndex();
     const known = Object.keys(D.PROFESSIONS);
     const extra = [...idx.keys()].filter(n => !D.PROFESSIONS[n]);
+    const posts = groupBy(boardRows(), r => r.prof);
 
     // Grouped by what kind of profession it is. Within a group, the ones
     // somebody has come first — the rest keep their dashed card, which is
@@ -398,7 +384,8 @@
 
     const section = (title, names) => names.length
       ? `<h2 class="section-title">${esc(title)}</h2>
-         <div class="profcards">${names.map(n => profCard(n, idx.get(n))).join('')}</div>`
+         <div class="profcards">${names.map(n =>
+           profCard(n, idx.get(n), (posts.get(n) || []).length)).join('')}</div>`
       : '';
 
     return section('Gathering', ofKind('gathering')) +
@@ -419,7 +406,9 @@
   function tradeRow(row, hideChar) {
     const meta = D.PROFESSIONS[row.prof] || {};
     const c = charNamed(row.char);
-    const skill = skillFor(row);
+    // Their skill in the profession they posted under, when we can tell.
+    const p = c && row.prof ? profsOf(c).find(x => x.name === row.prof) : null;
+    const skill = p && p.level !== '' ? `${row.prof} ${p.level}` : '';
     const who = [
       row.char && !hideChar
         ? `<b style="--cc:${esc((c && classColor(c.class)) || '#e6e9ef')}">${esc(row.char)}</b>`
@@ -430,7 +419,7 @@
     return `<div class="post" data-post="${esc(row.id)}"${canWrite() ? ' title="Click to edit this trade"' : ''}>
       <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}</span>
       <span class="pwho">${who || '<em>nobody said who</em>'}${
-        skill ? `<small>${esc(row.prof)} ${skill.level}</small>` : ''}</span>
+        skill ? `<small>${esc(skill)}</small>` : ''}</span>
       ${row.mats ? `<span class="pmats">You bring: ${esc(row.mats)}</span>` : '<span class="pmats"></span>'}
       ${row.note ? `<span class="pnote">${esc(row.note)}</span>` : ''}
     </div>`;
@@ -474,17 +463,13 @@
 
     if (ui.tgroup === 'new') {
       const sorted = [...list].sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
-      return toolbar + `<div class="posts">${sorted.map(tradeRow).join('')}</div>`;
+      return toolbar + `<div class="posts">${sorted.map(r => tradeRow(r)).join('')}</div>`;
     }
 
     const blank = NOT_SAID[ui.tgroup];
-    const keyOf = r => (ui.tgroup === 'char' ? r.char : ui.tgroup === 'by' ? r.by : r.prof) || blank;
-    const groups = new Map();
-    for (const r of list) {
-      const k = keyOf(r);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(r);
-    }
+    const byChar = ui.tgroup === 'char';
+    const groups = groupBy(list, r =>
+      (byChar ? r.char : ui.tgroup === 'by' ? r.by : r.prof) || blank);
 
     const body = [...groups.entries()]
       // Biggest group first, with the ones nobody labelled at the bottom.
@@ -492,7 +477,7 @@
         b[1].length - a[1].length || String(a[0]).localeCompare(String(b[0])))
       .map(([k, rs]) => {
         const icon = ui.tgroup === 'profession' ? ((D.PROFESSIONS[k] || {}).icon || '') : '';
-        const c = ui.tgroup === 'char' ? charNamed(k) : null;
+        const c = byChar ? charNamed(k) : null;
         const color = c ? classColor(c.class) : '';
         const sub = c
           ? [c.player, c.level ? 'Lv ' + c.level : ''].filter(Boolean).join(' · ')
@@ -501,7 +486,7 @@
             <h2${color ? ` style="color:${esc(color)}"` : ''}>${icon ? icon + ' ' : ''}${esc(k)}</h2>
             <span class="count">${esc(sub)}</span>
           </div>
-          <div class="posts">${rs.map(r => tradeRow(r, ui.tgroup === 'char')).join('')}</div>`;
+          <div class="posts">${rs.map(r => tradeRow(r, byChar)).join('')}</div>`;
       }).join('');
 
     return toolbar + body;
@@ -519,7 +504,7 @@
     else view.innerHTML = renderRoster();
 
     $('addBtn').hidden = !canWrite();
-    fillDatalists();
+    fillRosterLists();
   }
 
   function route() {
@@ -529,20 +514,24 @@
     window.scrollTo({ top: 0 });
   }
 
-  /* ---------- datalists ---------- */
+  /* ---------- suggestion lists ---------- */
 
-  function fillDatalists() {
-    const set = (id, values) => {
-      $(id).innerHTML = [...new Set(values.filter(Boolean))]
-        .map(v => `<option value="${esc(v)}">`).join('');
-    };
-    set('players', state.chars.map(c => c.player).sort());
-    set('chars', state.chars.map(c => c.name).sort());
-    set('races', D.RACES);
-    set('classes', Object.keys(D.CLASSES));
-    set('professions', Object.keys(D.PROFESSIONS));
-    fillProfSelects();
-    specsFor($('classInput') ? $('classInput').value : '');
+  const setList = (id, values) => {
+    $(id).innerHTML = [...new Set(values.filter(Boolean))]
+      .map(v => `<option value="${esc(v)}">`).join('');
+  };
+
+  /** Built once: these come from `data.js` and never change. */
+  function fillStaticLists() {
+    setList('races', D.RACES);
+    setList('classes', Object.keys(D.CLASSES));
+    setList('professions', Object.keys(D.PROFESSIONS));
+  }
+
+  /** Rebuilt on every render, because the roster is what they list. */
+  function fillRosterLists() {
+    setList('players', state.chars.map(c => c.player).sort());
+    setList('chars', state.chars.map(c => c.name).sort());
   }
 
   /**
@@ -803,6 +792,7 @@
 
   (async () => {
     $('realm').textContent = CFG.realm || '';
+    fillStaticLists();
     fillSecondaries();
     showMode();
     await refresh();

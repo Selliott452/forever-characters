@@ -176,11 +176,11 @@ function applyChanges_(cfg, upserts, deletes) {
 }
 
 /**
- * Optional: run once to fill an empty Roster with the characters we started
- * from, and the Posts tab with the two trades that were in the old sheet.
- * Either one is skipped if its tab already has rows.
+ * Optional: run once to fill the Roster with the characters we started from
+ * and the Posts tab with one example trade. Either tab is skipped if it
+ * already has rows.
  */
-function seedRoster() {
+function seedSheet() {
   seedTab_(SHEETS.roster, [
     // name, player, level, race, class, spec1, spec2, prof1, lvl, prof2, lvl,
     // cooking, fishing, firstaid, notes
