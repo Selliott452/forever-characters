@@ -545,8 +545,11 @@
       const sel = form[which];
       const had = sel.value;
       const names = PRIMARIES.includes(had) || !had ? PRIMARIES : PRIMARIES.concat(had);
+      // No icon in the label: a native select's type-ahead matches from the
+      // start of the option text, so a leading emoji eats the first keystroke
+      // and "t" never jumps to Tailoring.
       sel.innerHTML = '<option value="">— none —</option>' +
-        names.map(n => `<option value="${esc(n)}">${D.PROFESSIONS[n] ? D.PROFESSIONS[n].icon + ' ' : ''}${esc(n)}</option>`).join('');
+        names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
       sel.value = had;
     }
   }
