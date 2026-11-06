@@ -9,11 +9,8 @@
  *            person typed it, on the site or straight into the sheet.
  *
  * Rows are read and written by position, so `headers` must match the sheet's
- * column order exactly. `mats` is a leftover: the site stopped collecting it
- * on 2026-11-06, when the one Notes line took over, but the column stays so
- * the rows already written keep their text. Nothing writes to it any more,
- * and an upsert that leaves a field out keeps whatever the sheet already had
- * — see toRow_.
+ * column order exactly. An upsert that leaves a field out keeps whatever the
+ * sheet already had, rather than blanking it — see toRow_.
  *
  * GET  <url>  -> { ok, characters: [...], posts: [...] }
  * POST <url>  body: { token, upserts, deletes, postUpserts, postDeletes }
@@ -123,10 +120,10 @@ function numOrBlank_(v) {
  * Build a sheet row from an incoming object, given the row that's there now
  * (or null for a new one).
  *
- * A field the object *doesn't mention* keeps whatever the sheet already had.
- * That's what lets a column the site no longer collects — `mats` — survive an
- * edit instead of being blanked. A field it does mention wins, including when
- * it's an empty string, so clearing a box on the site still clears the cell.
+ * A field the object *doesn't mention* keeps whatever the sheet already had,
+ * so a column added by hand, or one the form stops collecting later, survives
+ * a save from the site. A field it does mention wins, including when it's an
+ * empty string, so clearing a box on the site still clears the cell.
  */
 function toRow_(cfg, c, prev) {
   const has = function (k) { return Object.prototype.hasOwnProperty.call(c, k); };
