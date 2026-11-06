@@ -165,7 +165,8 @@ footer { color: var(--dim); font-size: 12px; padding-bottom: 28px; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 10px;
-  margin-bottom: 18px;
+  /* The tab bar sits right above these, so they need room to breathe. */
+  margin: 14px 0 18px;
 }
 .stat {
   background: var(--panel);
