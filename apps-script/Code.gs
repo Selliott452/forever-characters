@@ -11,8 +11,8 @@
  * GET  <url>  -> { ok, characters: [...], posts: [...] }
  * POST <url>  body: { token, upserts, deletes, postUpserts, postDeletes }
  *
- * Both tabs stay friendly to hand-editing: add a row and leave `id` blank, and
- * the next write from the site fills one in.
+ * Both tabs start empty and stay friendly to hand-editing: add a row and leave
+ * `id` blank, and the next write from the site fills one in.
  */
 const SHEETS = {
   roster: {
@@ -173,45 +173,6 @@ function applyChanges_(cfg, upserts, deletes) {
   } finally {
     lock.releaseLock();
   }
-}
-
-/**
- * Optional: run once to fill the Roster with the characters we started from
- * and the Posts tab with one example trade. Either tab is skipped if it
- * already has rows.
- */
-function seedSheet() {
-  seedTab_(SHEETS.roster, [
-    // name, player, level, race, class, spec1, spec2, prof1, lvl, prof2, lvl,
-    // cooking, fishing, firstaid, notes
-    ['Daz Moonspear', 'Josh', 1, 'Night Elf', 'Druid', 'Feral (Bear)', 'Feral (Cat)', 'Skinning', 1, 'Leatherworking', 1, '', '', '', 'Transition Skinning to Engineering end game'],
-    ['Daz Lighthammer', 'Josh', 9, 'Dwarf', 'Paladin', 'Protection', 'Retribution', 'Mining', 1, 'Blacksmithing', 1, '', '', '', ''],
-    ['Daz Stoneblade', 'Josh', 1, 'Night Elf', 'Warrior', 'Protection', 'Fury', '', '', '', '', '', '', '', ''],
-    ['Smoke Blazenbeard', 'Ian', 1, 'Dwarf', 'Paladin', 'Retribution', 'Protection', '', '', '', '', '', '', '', ''],
-    ['Beard Smokenblaze', 'Ian', 1, 'Dwarf', 'Warrior', 'Fury', '', '', '', '', '', '', '', '', ''],
-    ['Soot Kegsplitter', 'Adam', 9, 'Dwarf', 'Shaman', 'Elemental', 'Restoration', 'Herbalism', 15, 'Alchemy', 14, '', '', '', ''],
-    ['Summon Yous', 'Adam', 1, 'Human', 'Warlock', 'AH Bot', 'Summon Bot', '', '', '', '', '', '', '', ''],
-    ['Oran Ge eard', 'Ryan', 9, 'Dwarf', 'Shaman', 'TBD', 'TBD', 'Mining', '', '', '', '', '', '', ''],
-    ['Anya BlazinBraids', 'Sam', 10, 'Dwarf', 'Priest', 'Shadow', 'TBD', 'Enchanting', 22, 'Tailoring', 44, 12, '', 30, ''],
-  ]);
-
-  seedTab_(SHEETS.posts, [
-    // char, profession, item, mats, note, by
-    ['Anya BlazinBraids', 'Enchanting', 'Minor Wizard Oil', 'bring the oil, I have the dust', 'free for the group', 'Sam'],
-  ]);
-}
-
-function seedTab_(cfg, seed) {
-  const sh = getSheet_(cfg);
-  if (sh.getLastRow() > 1) {
-    Logger.log(cfg.name + ' already has rows — not seeding.');
-    return;
-  }
-  const now = new Date().toISOString();
-  const rows = seed.map(function (s) { return [Utilities.getUuid().slice(0, 8)].concat(s, [now]); });
-  sh.getRange(2, 1, rows.length, cfg.headers.length).setNumberFormat('@');
-  sh.getRange(2, 1, rows.length, cfg.headers.length).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' rows into ' + cfg.name + '.');
 }
 
 function json_(obj) {

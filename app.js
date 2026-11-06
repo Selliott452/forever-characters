@@ -183,10 +183,7 @@
       let chars, posts;
       try { chars = roster ? JSON.parse(roster) : null; } catch { chars = null; }
       try { posts = board ? JSON.parse(board) : null; } catch { posts = null; }
-      return {
-        characters: chars || D.SEED.map(c => Object.assign({ id: newId() }, c)),
-        posts: posts || D.SEED_POSTS.map(x => Object.assign({ id: newId() }, x)),
-      };
+      return { characters: chars || [], posts: posts || [] };
     },
     async save() {
       ls.set('wow-roster', JSON.stringify(state.chars));
@@ -298,7 +295,10 @@
     </div>`;
 
     if (!list.length) {
-      return toolbar + `<p class="empty">${state.chars.length ? 'Nothing matches that.' : 'No characters yet.'}</p>`;
+      const nothing = state.chars.length ? 'Nothing matches that.'
+        : canWrite() ? 'No characters yet. Click <b>+ Character</b> to add the first one.'
+        : 'No characters yet.';
+      return toolbar + `<p class="empty">${nothing}</p>`;
     }
 
     if (group === 'level') {
@@ -796,7 +796,6 @@
     fillSecondaries();
     showMode();
     await refresh();
-    if (!SCRIPT_URL) await local.save();   // keep the seeded roster around
     route();
   })();
 })();

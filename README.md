@@ -60,9 +60,9 @@ npm start
 Then open http://localhost:8001. On Windows, double-clicking `start-server.bat` does
 the same thing.
 
-With no `scriptUrl` in `config.js` the site runs in preview mode: it starts from the
-roster in `data.js` and saves changes to that browser's localStorage, so you can click
-around without touching the sheet.
+With no `scriptUrl` in `config.js` the site runs in preview mode: it starts empty and
+saves whatever you add to that browser's localStorage, so you can click around without
+touching the sheet. Nothing you add in preview mode reaches anyone else.
 
 ## Wiring up the Google Sheet
 
@@ -70,12 +70,10 @@ around without touching the sheet.
 2. **Extensions → Apps Script**, delete the sample code and paste in `apps-script/Code.gs`.
 3. Run `setup()` once. Approve the permissions prompt, then open **View → Logs** and copy
    the write token it printed.
-4. Optionally run `seedSheet()` to fill empty tabs with the starting roster and
-   one example trade.
-5. **Deploy → New deployment → Web app**, with *Execute as: Me* and
+4. **Deploy → New deployment → Web app**, with *Execute as: Me* and
    *Who has access: Anyone*. Copy the `/exec` URL.
-6. Put that URL in `config.js` as `scriptUrl`, then commit and push.
-7. On the live site, click **Write key** once per device and paste the token. Anyone
+5. Put that URL in `config.js` as `scriptUrl`, then commit and push.
+6. On the live site, click **Write key** once per device and paste the token. Anyone
    without the token still sees the roster, they just can't change it.
 
 The token is the only thing standing between your friends and strangers editing the
