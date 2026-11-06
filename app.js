@@ -425,29 +425,12 @@
     const byKind = (a, b) => order.indexOf(D.PROFESSIONS[a].kind) - order.indexOf(D.PROFESSIONS[b].kind) ||
       a.localeCompare(b);
 
-    const primaries = known.filter(n => D.PROFESSIONS[n].kind !== 'secondary');
-    const coveredPrimary = primaries.filter(n => (idx.get(n) || { holders: [] }).holders.length).length;
-    const crafters = taken.filter(n => D.PROFESSIONS[n].kind === 'crafting');
-    const unsupported = crafters.filter(n => {
-      const needs = D.PROFESSIONS[n].needs;
-      return needs && !(idx.get(needs) || { holders: [] }).holders.length;
-    });
-    const maxSkill = Math.max(0, ...state.chars.flatMap(c => profsOf(c).map(p => Number(p.level) || 0)));
-
-    const stats = `<div class="stats">
-      <div class="stat"><b>${coveredPrimary}/${primaries.length}</b><span>Primary covered</span></div>
-      <div class="stat"><b>${crafters.length}</b><span>Crafting trades</span></div>
-      <div class="stat"><b>${unsupported.length}</b><span>Missing suppliers</span></div>
-      <div class="stat"><b>${maxSkill || '—'}</b><span>Top skill</span></div>
-    </div>`;
-
     const section = (title, names) => names.length
       ? `<h2 class="section-title">${esc(title)}</h2>
          <div class="profcards">${names.map(n => profCard(n, idx.get(n))).join('')}</div>`
       : '';
 
-    return stats +
-      section('Covered', taken.sort(byKind)) +
+    return section('Covered', taken.sort(byKind)) +
       section('Spelled differently in the sheet', extra.sort()) +
       section('Nobody has these yet', open.sort(byKind));
   }
