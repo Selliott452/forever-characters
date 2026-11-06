@@ -36,7 +36,7 @@
 
   const state = {
     chars: [],
-    posts: [],     // the trade board: one row per thing somebody offers to make
+    posts: [],     // the service board: one row per thing somebody offers to do
     route: 'roster',
     ui: { q: '', player: '', group: 'player', tq: '', tprof: '', tgroup: 'profession' },
   };
@@ -113,7 +113,7 @@
       .filter(([name]) => String(name || '').trim())
       .map(([raw, lvl]) => one(raw, lvl));
     // A secondary counts as "has it" once there's a skill against it — nobody
-    // wants three empty rows on every card for trades they haven't touched.
+    // wants three empty rows on every card for ones they haven't touched.
     for (const name of SECONDARIES) {
       if (Number(c[secKey(name)]) > 0) out.push(one(name, c[secKey(name)]));
     }
@@ -129,13 +129,13 @@
       .filter(p => !have.has(p) && new RegExp('\\b' + p + '\\b', 'i').test(text));
   }
 
-  /* ---------- the trade board ---------- */
+  /* ---------- the service board ---------- */
 
   /**
-   * Trades are just what people typed. Nothing is generated from a recipe list
-   * or fetched from anywhere, so the only derived bit is the link back to a
-   * roster character: we match on name, so the sheet stays readable and a
-   * trade posted for someone not on the roster still shows.
+   * Services are just what people typed. Nothing is generated from a recipe
+   * list or fetched from anywhere, so the only derived bit is the link back to
+   * a roster character: we match on name, so the sheet stays readable and a
+   * service posted for someone not on the roster still shows.
    */
   const charNamed = name => state.chars.find(c =>
     String(c.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
@@ -149,7 +149,6 @@
       char: text('char'),
       prof: normProf(post.profession) || text('profession'),
       item: text('item'),
-      mats: text('mats'),
       note: text('note'),
       by: text('by'),
       updated: post.updated || '',
@@ -356,8 +355,8 @@
     const holders = entry ? entry.holders : [];
     const bestLevel = Math.max(...holders.map(h => Number(h.p.level) || 0), 0);
     const postLine = posted
-      ? `<p class="unlocked"><b>${posted}</b> thing${posted === 1 ? '' : 's'} on the trade board
-           &middot; <a href="#/trades" data-prof="${esc(name)}">see them</a></p>`
+      ? `<p class="unlocked"><b>${posted}</b> on the service board
+           &middot; <a href="#/services" data-prof="${esc(name)}">see them</a></p>`
       : '';
 
     return `<article class="profcard${holders.length ? '' : ' gap'}">
@@ -396,7 +395,7 @@
       section('Spelled differently in the sheet', extra.sort());
   }
 
-  /* ---------- view: trade board ---------- */
+  /* ---------- view: service board ---------- */
 
   // What a group is called when nobody filled that field in.
   const NOT_SAID = {
@@ -405,7 +404,7 @@
     by: 'Unsigned',
   };
 
-  function tradeRow(row, hideChar) {
+  function serviceRow(row, hideChar) {
     const meta = D.PROFESSIONS[row.prof] || {};
     const c = charNamed(row.char);
     // Their skill in the profession they posted under, when we can tell.
@@ -418,16 +417,15 @@
       row.by && row.by.toLowerCase() !== String(row.char).toLowerCase() ? esc(row.by) : '',
     ].filter(Boolean).join(' <span class="sep">&middot;</span> ');
 
-    return `<div class="post" data-post="${esc(row.id)}"${canWrite() ? ' title="Click to edit this trade"' : ''}>
+    return `<div class="post" data-post="${esc(row.id)}"${canWrite() ? ' title="Click to edit this service"' : ''}>
       <span class="pitem">${meta.icon ? meta.icon + ' ' : ''}${esc(row.item)}</span>
       <span class="pwho">${who || '<em>nobody said who</em>'}${
         skill ? `<small>${esc(skill)}</small>` : ''}</span>
-      ${row.mats ? `<span class="pmats">You bring: ${esc(row.mats)}</span>` : '<span class="pmats"></span>'}
       ${row.note ? `<span class="pnote">${esc(row.note)}</span>` : ''}
     </div>`;
   }
 
-  function renderTrades() {
+  function renderServices() {
     const ui = state.ui;
     const all = boardRows();
     const profs = [...new Set(all.map(r => r.prof).filter(Boolean))].sort();
@@ -435,17 +433,17 @@
     const q = ui.tq.toLowerCase();
     const list = all
       .filter(r => !ui.tprof || r.prof === ui.tprof)
-      .filter(r => !q || [r.item, r.mats, r.note, r.char, r.by, r.prof]
+      .filter(r => !q || [r.item, r.note, r.char, r.by, r.prof]
         .join(' ').toLowerCase().includes(q));
 
     const toolbar = `<div class="toolbar">
-      <input type="search" id="tq" placeholder="Search trades…" value="${esc(ui.tq)}">
+      <input type="search" id="tq" placeholder="Search services…" value="${esc(ui.tq)}">
       <select id="tgroup">
         ${[['profession', 'Group by profession'], ['char', 'Group by character'],
            ['by', 'Group by player'], ['new', 'Newest first']]
           .map(([k, label]) => `<option value="${k}"${ui.tgroup === k ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      ${canWrite() ? '<button id="addPost" class="primary">+ Post a trade</button>' : ''}
+      ${canWrite() ? '<button id="addPost" class="primary">+ Post a service</button>' : ''}
       <span class="spacer"></span>
       <div class="chips">
         <button class="chip${ui.tprof ? '' : ' on'}" data-prof-filter="">Everything</button>
@@ -458,14 +456,14 @@
       const nothing = all.length
         ? 'Nothing matches that.'
         : canWrite()
-          ? 'No trades yet. Click <b>+ Post a trade</b> to put the first one up.'
-          : 'No trades yet.';
+          ? 'No services yet. Click <b>+ Post a service</b> to put the first one up.'
+          : 'No services yet.';
       return toolbar + `<p class="empty">${nothing}</p>`;
     }
 
     if (ui.tgroup === 'new') {
       const sorted = [...list].sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
-      return toolbar + `<div class="posts">${sorted.map(r => tradeRow(r)).join('')}</div>`;
+      return toolbar + `<div class="posts">${sorted.map(r => serviceRow(r)).join('')}</div>`;
     }
 
     const blank = NOT_SAID[ui.tgroup];
@@ -483,12 +481,12 @@
         const color = c ? classColor(c.class) : '';
         const sub = c
           ? [c.player, c.level ? 'Lv ' + c.level : ''].filter(Boolean).join(' · ')
-          : `${rs.length} trade${rs.length === 1 ? '' : 's'}`;
+          : `${rs.length} service${rs.length === 1 ? '' : 's'}`;
         return `<div class="playerhead">
             <h2${color ? ` style="color:${esc(color)}"` : ''}>${icon ? icon + ' ' : ''}${esc(k)}</h2>
             <span class="count">${esc(sub)}</span>
           </div>
-          <div class="posts">${rs.map(r => tradeRow(r, byChar)).join('')}</div>`;
+          <div class="posts">${rs.map(r => serviceRow(r, byChar)).join('')}</div>`;
       }).join('');
 
     return toolbar + body;
@@ -502,7 +500,7 @@
       a.classList.toggle('on', a.dataset.tab === state.route));
 
     if (state.route === 'professions') view.innerHTML = renderProfessions();
-    else if (state.route === 'trades') view.innerHTML = renderTrades();
+    else if (state.route === 'services') view.innerHTML = renderServices();
     else view.innerHTML = renderRoster();
 
     $('addBtn').hidden = !canWrite();
@@ -511,7 +509,9 @@
 
   function route() {
     const hash = (location.hash || '#/roster').replace(/^#\/?/, '');
-    state.route = ['roster', 'professions', 'trades'].includes(hash) ? hash : 'roster';
+    // The board used to be the trade board; keep old links and bookmarks working.
+    const name = hash === 'trades' ? 'services' : hash;
+    state.route = ['roster', 'professions', 'services'].includes(name) ? name : 'roster';
     render();
     window.scrollTo({ top: 0 });
   }
@@ -640,12 +640,12 @@
   function openPost(post) {
     const blank = {
       id: '', char: '', profession: state.ui.tprof || '',
-      item: '', mats: '', note: '', by: myName,
+      item: '', note: '', by: myName,
     };
     const data = Object.assign({}, blank, post || {});
     for (const k of Object.keys(blank)) if (rform[k]) rform[k].value = data[k] ?? '';
 
-    $('postTitle').textContent = post ? 'Edit trade' : 'Post a trade';
+    $('postTitle').textContent = post ? 'Edit service' : 'Post a service';
     $('removePost').hidden = !post;
     postHint();
     rdlg.showModal();
@@ -660,7 +660,7 @@
     const c = charNamed(name);
     if (!c) {
       hint.className = 'hint warn';
-      hint.textContent = `No character called “${name}” on the roster — the trade still posts.`;
+      hint.textContent = `No character called “${name}” on the roster — the service still posts.`;
       return;
     }
     const profs = profsOf(c).map(p => `${p.icon} ${p.name}${p.level === '' ? '' : ' ' + p.level}`);
@@ -679,7 +679,7 @@
     // in preview mode, where there is no sheet.
     o.updated = new Date().toISOString();
     // A character that is on the roster gets stored under its exact spelling,
-    // so the board can tie the trade back to them later.
+    // so the board can tie the service back to them later.
     const c = charNamed(o.char);
     if (c) o.char = c.name;
     myName = o.by;
@@ -758,7 +758,7 @@
       else state.ui.player = chip.dataset.player;
       return render();
     }
-    // "see them" on a profession card jumps to that profession's trades.
+    // "see them" on a profession card jumps to that profession's services.
     const seeAll = e.target.closest('[data-prof]');
     if (seeAll) { state.ui.tprof = seeAll.dataset.prof; return; }
 

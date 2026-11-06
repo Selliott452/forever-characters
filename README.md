@@ -18,28 +18,31 @@ a Google Sheet through a small Apps Script web app.
   everyone has those. A secondary shows up once you put a number against it.
 - **Professions** — the part worth having. For every profession: who has it, their skill
   rank and progress towards that rank's cap, a star on the group's best crafter, and how
-  many trades are posted for it, grouped into gathering, crafting and secondary. The
+  many services are posted for it, grouped into gathering, crafting and secondary. The
   ones nobody has yet sit at the end of their group with a dashed border.
-- **Trade board** — a board of trades people have posted: *I can craft this, bring
-  me that*. Nothing on it is generated or fetched — every line is there because
-  somebody typed it. Each trade carries the character who makes it, the
-  profession, what to bring, a note and who to ask. Group it by profession,
-  character or player, or sort newest first, and filter to one profession with
-  the chips.
+- **Service board** — a board of services people have posted: *I can craft this for
+  you*. Nothing on it is generated or fetched — every line is there because somebody
+  typed it. Each one carries the character who makes it, the profession, who to ask,
+  and notes. Group it by profession, character or player, or sort newest first, and
+  filter to one profession with the chips.
 
 Professions parse loosely: `Herblore`, `herb` and `Herbalism` all count as Herbalism,
 and a skill of `22?` reads as 22. Anything it doesn't recognise is kept and shown as
 typed, so nothing you write in the sheet gets lost.
 
-## Posting a trade
+## Posting a service
 
-**+ Post a trade** on the board puts one up; clicking a trade opens it again to
-edit, or to **take it down**. The only required field is what you can craft —
-everything else is optional, so "Portals to Ironforge" with nothing else filled in
-is a perfectly good post.
+**+ Post a service** on the board puts one up; clicking one opens it again to edit, or
+to **take it down**. The only required field is what you can craft — everything else is
+optional, so "Portals to Ironforge" with nothing else filled in is a perfectly good
+post.
+
+**Notes** is where materials go, among anything else: *bring 6 linen cloth*, *I have
+the mats*, *free for the group*, *whisper me after raid*. There's deliberately no
+separate materials field — one free-text line says whatever the job actually needs.
 
 If you name a character who's on the roster, the board shows their skill in that
-profession next to the trade, so people can see it's the maxed Tailor and not the
+profession next to the service, so people can see it's the maxed Tailor and not the
 level 3 alt. Name one who isn't on the roster and it posts anyway.
 
 Your name is remembered in your browser so you only type it once.
@@ -112,10 +115,10 @@ profession slots are dropdowns, so those are the whole list.
 
 ## The sheet
 
-Two tabs. `Posts` is the trade board, one row per trade:
+Two tabs. `Posts` is the service board, one row per service:
 
 ```
-id | char | profession | item | mats | note | by | updated
+id | char | profession | item | note | by | updated
 ```
 
 Only `item` is required. Editing by hand in the sheet works just as well as editing

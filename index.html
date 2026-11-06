@@ -21,7 +21,7 @@
     <nav class="tabs">
       <a href="#/roster" data-tab="roster">Roster</a>
       <a href="#/professions" data-tab="professions">Professions</a>
-      <a href="#/trades" data-tab="trades">Trade board</a>
+      <a href="#/services" data-tab="services">Service board</a>
     </nav>
 
     <div class="status" id="status"></div>
@@ -103,10 +103,10 @@
   </form>
 </dialog>
 
-<!-- Post a trade -->
+<!-- Post a service -->
 <dialog id="postDialog">
   <form id="postForm">
-    <h2 id="postTitle">Post a trade</h2>
+    <h2 id="postTitle">Post a service</h2>
 
     <input type="hidden" name="id">
 
@@ -124,12 +124,8 @@
       <p class="hint" id="postHint"></p>
     </div>
 
-    <label>What to bring
-      <input name="mats" autocomplete="off" placeholder="e.g. 6x Linen Cloth, or “I have the mats”">
-    </label>
-
-    <label>Note
-      <input name="note" autocomplete="off" placeholder="e.g. free for the group, whisper me">
+    <label>Notes
+      <input name="note" autocomplete="off" placeholder="e.g. bring 6 linen cloth, or I have the mats">
     </label>
 
     <label>Your name

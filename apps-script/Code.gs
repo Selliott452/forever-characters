@@ -4,9 +4,14 @@
  * Two tabs, both one row per thing, both keyed by a short `id` so a rename
  * doesn't lose the row:
  *   Roster — the characters.
- *   Posts  — the trade board. One row per trade somebody has posted. Nothing is
- *            generated or imported: every row is there because a person typed
- *            it, on the site or straight into the sheet.
+ *   Posts  — the service board. One row per service somebody has posted.
+ *            Nothing is generated or imported: every row is there because a
+ *            person typed it, on the site or straight into the sheet.
+ *
+ * NOTE: rows are read by position, so the column order here must match the
+ * sheet exactly. A `mats` column sat between `item` and `note` until
+ * 2026-11-06; delete it from the sheet before pasting this in, or every row
+ * shifts one column left.
  *
  * GET  <url>  -> { ok, characters: [...], posts: [...] }
  * POST <url>  body: { token, upserts, deletes, postUpserts, postDeletes }
@@ -29,7 +34,7 @@ const SHEETS = {
   },
   posts: {
     name: 'Posts',
-    headers: ['id', 'char', 'profession', 'item', 'mats', 'note', 'by', 'updated'],
+    headers: ['id', 'char', 'profession', 'item', 'note', 'by', 'updated'],
     required: ['item'],
     numbers: [],
   },
