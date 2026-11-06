@@ -1,6 +1,6 @@
 # Forever Characters
 
-**[selliott452.github.io/forever-characters](https://selliott452.github.io/forever-characters/)**
+**[characters.selliott.me](https://characters.selliott.me/)**
 
 A small website for tracking the characters you and your friends are levelling in
 **World of Warcraft: Forever**: who's playing what, where their professions are, and
@@ -83,10 +83,14 @@ sheet, so share it in your group chat, not on the page.
 
 ## Hosting on GitHub Pages
 
-This one is live at **https://selliott452.github.io/forever-characters/**, served from
-`main` at the repo root. To host your own copy: push it to a GitHub repo, then
-**Settings → Pages → Source: Deploy from a branch**, branch `main`, folder `/ (root)`.
-`.nojekyll` is already there so Pages serves the files as-is.
+This one is live at **https://characters.selliott.me/**, served from `main` at the repo
+root. To host your own copy: push it to a GitHub repo, then **Settings → Pages →
+Source: Deploy from a branch**, branch `main`, folder `/ (root)`. `.nojekyll` is already
+there so Pages serves the files as-is.
+
+The custom domain comes from the `CNAME` file in the repo root, paired with a DNS
+CNAME record pointing `characters` at `selliott452.github.io`. Delete that file to go
+back to the `github.io` address.
 
 ## Configuration
 
